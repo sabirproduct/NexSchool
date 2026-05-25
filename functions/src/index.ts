@@ -14,3 +14,10 @@ export const detectTimetableConflict = onCall(() => ({ ok: true, conflictFree: t
 export const calculateTeacherWorkload = onCall(() => ({ ok: true, workloadByTeacher: [] }));
 export const validateSessionActivation = onCall(() => ({ ok: true, singleActiveSession: true }));
 export const sendAcademicReminders = onCall(() => ({ ok: true, channels: ['email','sms','app'] }));
+
+export const calculateExamGPA = onCall(() => ({ ok: true, message: 'Exam GPA calculation placeholder' }));
+export const generateStudentRanks = onCall(() => ({ ok: true, message: 'Student rank generation placeholder' }));
+export const publishExamResults = onCall(() => ({ ok: true, message: 'Result publishing workflow placeholder' }));
+export const generateReportCardPdf = onCall(() => ({ ok: true, message: 'Report card PDF generation placeholder' }));
+export const aggregateResultAnalytics = onCall(() => ({ ok: true, message: 'Result analytics aggregation placeholder' }));
+export const triggerResultNotifications = onCall(() => ({ ok: true, channels: ['sms', 'email', 'app'] }));

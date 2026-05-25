@@ -115,6 +115,43 @@ service cloud.firestore {
     match /leaveApplications/{leaveId} { allow read: if signedIn(); allow write: if signedIn(); }
     match /attendanceSettings/{settingId} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
 
+
+
+    match /exams/{examId} {
+      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
+      allow create, update, delete: if signedIn() && isAdmin();
+    }
+
+    match /examSchedules/{scheduleId} {
+      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
+      allow create, update, delete: if signedIn() && (isAdmin() || role() == 'teacher');
+    }
+
+    match /marks/{markId} {
+      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
+      allow create, update: if signedIn() && (
+        isAdmin() ||
+        (role() == 'teacher' && request.resource.data.subjectId in userDoc().assignedSubjectIds)
+      );
+      allow delete: if signedIn() && isAdmin();
+    }
+
+    match /results/{resultId} {
+      allow read: if signedIn() && (
+        isAdmin() ||
+        role() == 'teacher' ||
+        (role() == 'student' && resource.data.studentId == request.auth.uid) ||
+        (role() == 'parent' && resource.data.studentId in userDoc().studentIds)
+      );
+      allow create, update, delete: if signedIn() && isAdmin();
+    }
+
+    match /gradeRules/{ruleId} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+    match /reportCards/{reportCardId} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+    match /resultAnalytics/{analyticsId} { allow read: if signedIn() && (isAdmin() || role() == 'teacher'); allow write: if signedIn() && isAdmin(); }
+    match /studentRanks/{rankId} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+    match /examAttendance/{attendanceId} { allow read: if signedIn(); allow write: if signedIn() && (isAdmin() || role() == 'teacher'); }
+
     match /{document=**} { allow read, write: if signedIn() && role() == 'super_admin'; }
   }
 }
