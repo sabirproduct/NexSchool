@@ -4,6 +4,7 @@ import { RouteGuard } from './RouteGuard';
 import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardPage } from '../features/dashboard/Page';
 import { StudentsPage } from '../features/students/Page';
+import { AddStudentPage, EditStudentPage, StudentDetailsPage, StudentPromotionPage } from '../modules/students/pages';
 import { AdmissionsPage } from '../features/admissions/Page';
 import { AttendancePage } from '../features/attendance/Page';
 import { AcademicsPage } from '../features/academics/Page';
@@ -22,6 +23,10 @@ export function App() {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/students" element={<StudentsPage />} />
+          <Route path="/students/new" element={<AddStudentPage />} />
+          <Route path="/students/:id" element={<StudentDetailsPage />} />
+          <Route path="/students/:id/edit" element={<EditStudentPage />} />
+          <Route path="/students/promotions" element={<StudentPromotionPage />} />
           <Route path="/admissions" element={<AdmissionsPage />} />
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/academics" element={<AcademicsPage />} />
