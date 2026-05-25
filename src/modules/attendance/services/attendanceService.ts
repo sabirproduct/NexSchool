@@ -44,8 +44,8 @@ export async function getStudentAttendanceSummary(schoolId: string, studentId: s
     where('attendanceDate', '<=', monthEnd),
   ]);
 
-  const presentDays = records.filter((r) => r.status === 'present').length;
-  const absentDays = records.filter((r) => r.status === 'absent').length;
+  const presentDays = records.filter((r) => r.status === 'Present').length;
+  const absentDays = records.filter((r) => r.status === 'Absent').length;
   const totalDays = presentDays + absentDays;
 
   return {

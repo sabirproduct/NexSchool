@@ -31,20 +31,20 @@ async function withFallback<T>(
 export async function listStudents(filters: StudentFilters, page: number, pageSize: number, schoolId?: string) {
   return withFallback(
     async () => {
-      const constraints = schoolId ? [where('schoolId', '==', schoolId)] : [];
+      const whereConstraints: any[] = [];
+      if (schoolId) whereConstraints.push(where('schoolId', '==', schoolId));
       if (filters.search) {
-        constraints.push(where('fullName', '>=', filters.search));
-        constraints.push(where('fullName', '<=', filters.search + '\uf8ff'));
+        whereConstraints.push(where('fullName', '>=', filters.search));
+        whereConstraints.push(where('fullName', '<=', filters.search + '\uf8ff'));
       }
-      if (filters.classId) constraints.push(where('academic.classId', '==', filters.classId));
-      if (filters.sectionId) constraints.push(where('academic.sectionId', '==', filters.sectionId));
-      if (filters.status) constraints.push(where('status', '==', filters.status));
+      if (filters.classId) whereConstraints.push(where('academic.classId', '==', filters.classId));
+      if (filters.sectionId) whereConstraints.push(where('academic.sectionId', '==', filters.sectionId));
+      if (filters.status) whereConstraints.push(where('status', '==', filters.status));
 
       const sortBy = filters.sortBy ?? 'fullName';
       const sortOrder = filters.sortOrder === 'desc' ? 'desc' : 'asc';
-      constraints.push(orderBy(sortBy, sortOrder));
 
-      const q = query(collection(db!, 'students'), ...constraints, limit((page + 1) * pageSize));
+      const q = query(collection(db!, 'students'), ...whereConstraints, orderBy(sortBy, sortOrder), limit((page + 1) * pageSize));
       const snapshot = await getDocs(q);
       const rows = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Student));
 
@@ -62,7 +62,10 @@ export async function listStudents(filters: StudentFilters, page: number, pageSi
 
 export async function getStudentById(id: string): Promise<Student | undefined> {
   return withFallback(
-    () => getDocument<Student>('students', id),
+    async () => {
+      const doc = await getDocument<Student>('students', id);
+      return doc || undefined;
+    },
     mockStudents.find((s) => s.id === id)
   );
 }

@@ -47,22 +47,34 @@ export async function approveAdmissionTransaction(
     const studentId = `STU-${Date.now()}`;
     const studentRef = doc(db!, 'students', studentId);
     txn.set(studentRef, {
-      ...application.applicantDetails,
-      schoolId: application.schoolId,
+      firstName: application.studentFirstName,
+      lastName: application.studentLastName,
+      fullName: application.fullName,
+      gender: application.gender.toLowerCase(),
+      dob: application.dob,
+      mobile: application.mobile,
+      email: application.email,
       admissionNo: `ADM-${Date.now()}`,
-      classId: application.classAppliedFor,
+      academic: {
+        classId: application.applyingClassId,
+        sectionId: '',
+        rollNo: '',
+        admissionNo: `ADM-${Date.now()}`,
+      },
       status: 'active',
       createdAt: serverTimestamp(),
     });
 
     // 3. Create parent record
-    if (application.parentDetails) {
+    if (application.guardianName) {
       const parentId = `PAR-${Date.now()}`;
       const parentRef = doc(db!, 'parents', parentId);
       txn.set(parentRef, {
-        ...application.parentDetails,
+        parentName: application.guardianName,
+        parentType: 'guardian',
+        email: application.email,
+        phone: application.mobile,
         studentId,
-        schoolId: application.schoolId,
         createdAt: serverTimestamp(),
       });
     }
@@ -72,9 +84,8 @@ export async function approveAdmissionTransaction(
     const notifRef = doc(db!, 'notifications', notifId);
     txn.set(notifRef, {
       studentId,
-      schoolId: application.schoolId,
       title: 'Admission Approved',
-      message: `Your admission to ${application.classAppliedFor} has been approved!`,
+      message: `Your admission has been approved!`,
       type: 'admission',
       read: false,
       createdAt: serverTimestamp(),
