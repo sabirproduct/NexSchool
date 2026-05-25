@@ -60,6 +60,37 @@ service cloud.firestore {
       allow update, delete: if signedIn() && isAdmin();
     }
 
+
+    match /studentAttendance/{attendanceId} {
+      allow read: if signedIn() && (
+        isAdmin() ||
+        (role() == 'teacher' && resource.data.classId in userDoc().assignedClassIds) ||
+        (role() == 'student' && resource.data.studentId == request.auth.uid) ||
+        (role() == 'parent' && resource.data.studentId in userDoc().studentIds)
+      );
+      allow create, update: if signedIn() && (isAdmin() || role() == 'teacher');
+      allow delete: if signedIn() && isAdmin();
+    }
+
+    match /teacherAttendance/{attendanceId} {
+      allow read: if signedIn() && (isAdmin() || role() in ['teacher','accountant']);
+      allow write: if signedIn() && isAdmin();
+    }
+
+    match /hostelAttendance/{recordId} {
+      allow read: if signedIn() && (isAdmin() || role() in ['hostel_warden','teacher']);
+      allow write: if signedIn() && (isAdmin() || role() == 'hostel_warden');
+    }
+
+    match /attendanceSummary/{studentId} {
+      allow read: if signedIn() && (isAdmin() || request.auth.uid == studentId || studentId in userDoc().studentIds || role() == 'teacher');
+      allow write: if signedIn() && isAdmin();
+    }
+
+    match /attendanceLogs/{logId} { allow read, write: if signedIn() && isAdmin(); }
+    match /leaveApplications/{leaveId} { allow read: if signedIn(); allow write: if signedIn(); }
+    match /attendanceSettings/{settingId} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+
     match /{document=**} { allow read, write: if signedIn() && role() == 'super_admin'; }
   }
 }
