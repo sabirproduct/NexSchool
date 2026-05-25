@@ -34,6 +34,30 @@ service cloud.firestore {
     match /classes/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
     match /sections/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
     match /hostels/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+
+    match /academicSessions/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+    match /subjects/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+    match /classSubjects/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+    match /teacherAssignments/{id} {
+      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
+      allow write: if signedIn() && isAdmin();
+    }
+    match /periods/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+    match /academicCalendar/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+    match /curriculum/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+    match /homework/{id} {
+      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
+      allow write: if signedIn() && (isAdmin() || role() == 'teacher');
+    }
+    match /timetables/{timetableId} {
+      allow read: if signedIn() && (
+        isAdmin() ||
+        role() == 'teacher' ||
+        role() == 'student' ||
+        role() == 'parent'
+      );
+      allow create, update, delete: if signedIn() && isAdmin();
+    }
     match /admissionApplications/{applicationId} {
       allow create: if true;
       allow read: if signedIn() && isAdmin();

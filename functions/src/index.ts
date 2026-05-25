@@ -9,3 +9,8 @@ export const calculateAttendanceSummary = onCall(() => ({ ok: true, message: 'At
 export const triggerLowAttendanceAlerts = onCall(() => ({ ok: true, warningThreshold: 75, criticalThreshold: 50 }));
 export const triggerAttendanceNotifications = onCall(() => ({ ok: true, channels: ['sms', 'whatsapp', 'parent-app'] }));
 export const aggregateDailyAttendance = onCall(() => ({ ok: true, message: 'Daily attendance aggregation placeholder' }));
+
+export const detectTimetableConflict = onCall(() => ({ ok: true, conflictFree: true, message: 'Timetable conflict validation placeholder' }));
+export const calculateTeacherWorkload = onCall(() => ({ ok: true, workloadByTeacher: [] }));
+export const validateSessionActivation = onCall(() => ({ ok: true, singleActiveSession: true }));
+export const sendAcademicReminders = onCall(() => ({ ok: true, channels: ['email','sms','app'] }));
