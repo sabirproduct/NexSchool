@@ -34,6 +34,31 @@ service cloud.firestore {
     match /classes/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
     match /sections/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
     match /hostels/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
+    match /admissionApplications/{applicationId} {
+      allow create: if true;
+      allow read: if signedIn() && isAdmin();
+      allow update: if signedIn() && isAdmin();
+      allow delete: if signedIn() && role() == 'super_admin';
+    }
+    match /admissionEnquiries/{enquiryId} {
+      allow create: if true;
+      allow read, update, delete: if signedIn() && isAdmin();
+    }
+    match /admissionReviews/{reviewId} {
+      allow read, write: if signedIn() && isAdmin();
+    }
+    match /admissionDocuments/{documentId} {
+      allow create: if true;
+      allow read, update, delete: if signedIn() && isAdmin();
+    }
+    match /admissionFees/{feeId} {
+      allow read, write: if signedIn() && isAdmin();
+    }
+    match /notifications/{notificationId} {
+      allow create: if signedIn() && isAdmin();
+      allow read: if signedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow update, delete: if signedIn() && isAdmin();
+    }
 
     match /{document=**} { allow read, write: if signedIn() && role() == 'super_admin'; }
   }
