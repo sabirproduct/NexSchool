@@ -1,35 +1,117 @@
+import { where, orderBy, limit, startAfter, getDocs, query, collection } from 'firebase/firestore';
+import { db } from '../../../config/firebase';
 import { mockStudents } from '../mocks/seed';
 import { Student, StudentFilters } from '../types';
+import {
+  getAllDocuments,
+  getDocument,
+  createDocument,
+  updateDocument,
+  batchWriteDocuments,
+  subscribeToCollection,
+} from '../../../services/firestoreService';
 
-let memory = [...mockStudents];
-
-export async function listStudents(filters: StudentFilters, page: number, pageSize: number) {
-  let rows = [...memory];
-  if (filters.search) rows = rows.filter((s) => s.fullName.toLowerCase().includes(filters.search!.toLowerCase()) || s.academic.admissionNo.includes(filters.search!));
-  if (filters.classId) rows = rows.filter((s) => s.academic.classId === filters.classId);
-  if (filters.sectionId) rows = rows.filter((s) => s.academic.sectionId === filters.sectionId);
-  if (filters.gender) rows = rows.filter((s) => s.gender === filters.gender);
-  if (filters.status) rows = rows.filter((s) => s.status === filters.status);
-  if (filters.studentType) rows = rows.filter((s) => s.academic.studentType === filters.studentType);
-
-  const sortBy = filters.sortBy ?? 'name';
-  const sortOrder = filters.sortOrder ?? 'asc';
-  rows.sort((a, b) => {
-    const dir = sortOrder === 'asc' ? 1 : -1;
-    if (sortBy === 'name') return a.fullName.localeCompare(b.fullName) * dir;
-    if (sortBy === 'admissionDate') return a.academic.admissionDate.localeCompare(b.academic.admissionDate) * dir;
-    return a.academic.rollNo.localeCompare(b.academic.rollNo, undefined, { numeric: true }) * dir;
-  });
-
-  const total = rows.length;
-  const start = page * pageSize;
-  return { rows: rows.slice(start, start + pageSize), total };
+// Fallback to mock data if Firebase is not configured
+async function withFallback<T>(
+  firebaseCall: () => Promise<T>,
+  mockData: T
+): Promise<T> {
+  if (!db) {
+    console.warn('Firebase not configured. Using mock data.');
+    return mockData;
+  }
+  try {
+    return await firebaseCall();
+  } catch (error) {
+    console.error('Firestore error, falling back to mock data:', error);
+    return mockData;
+  }
 }
 
-export async function getStudentById(id: string) { return memory.find((s) => s.id === id); }
-export async function createStudent(student: Student) { memory = [{ ...student }, ...memory]; return student; }
-export async function updateStudent(id: string, patch: Partial<Student>) { memory = memory.map((s) => s.id === id ? { ...s, ...patch, updatedAt: new Date().toISOString() } : s); return getStudentById(id); }
-export async function softDeleteStudent(id: string) { return updateStudent(id, { status: 'inactive' }); }
-export async function promoteStudents(ids: string[], classId: string, sectionId: string, session: string) {
-  memory = memory.map((s) => ids.includes(s.id) ? { ...s, academic: { ...s.academic, classId, sectionId, session } } : s);
+export async function listStudents(filters: StudentFilters, page: number, pageSize: number, schoolId?: string) {
+  return withFallback(
+    async () => {
+      const constraints = schoolId ? [where('schoolId', '==', schoolId)] : [];
+      if (filters.search) {
+        constraints.push(where('fullName', '>=', filters.search));
+        constraints.push(where('fullName', '<=', filters.search + '\uf8ff'));
+      }
+      if (filters.classId) constraints.push(where('academic.classId', '==', filters.classId));
+      if (filters.sectionId) constraints.push(where('academic.sectionId', '==', filters.sectionId));
+      if (filters.status) constraints.push(where('status', '==', filters.status));
+
+      const sortBy = filters.sortBy ?? 'fullName';
+      const sortOrder = filters.sortOrder === 'desc' ? 'desc' : 'asc';
+      constraints.push(orderBy(sortBy, sortOrder));
+
+      const q = query(collection(db!, 'students'), ...constraints, limit((page + 1) * pageSize));
+      const snapshot = await getDocs(q);
+      const rows = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Student));
+
+      return {
+        rows: rows.slice(page * pageSize),
+        total: rows.length,
+      };
+    },
+    {
+      rows: mockStudents.slice(page * pageSize, (page + 1) * pageSize),
+      total: mockStudents.length,
+    }
+  );
+}
+
+export async function getStudentById(id: string): Promise<Student | undefined> {
+  return withFallback(
+    () => getDocument<Student>('students', id),
+    mockStudents.find((s) => s.id === id)
+  );
+}
+
+export async function createStudent(student: Student, schoolId?: string): Promise<Student> {
+  return withFallback(
+    () => createDocument<Student>('students', { ...student, schoolId }),
+    student
+  );
+}
+
+export async function updateStudent(id: string, patch: Partial<Student>): Promise<Student | undefined> {
+  await withFallback(
+    () => updateDocument('students', id, { ...patch, updatedAt: new Date().toISOString() }),
+    null
+  );
+  return getStudentById(id);
+}
+
+export async function softDeleteStudent(id: string): Promise<Student | undefined> {
+  return updateStudent(id, { status: 'inactive' });
+}
+
+export async function promoteStudents(
+  ids: string[],
+  classId: string,
+  sectionId: string,
+  session: string
+): Promise<void> {
+  return withFallback(
+    async () => {
+      const operations = ids.map((id) => ({
+        type: 'update' as const,
+        collection: 'students',
+        docId: id,
+        data: {
+          academic: { classId, sectionId, session },
+        },
+      }));
+      await batchWriteDocuments(operations);
+    },
+    undefined
+  );
+}
+
+export function subscribeToStudents(schoolId: string, callback: (students: Student[]) => void) {
+  if (!db) {
+    callback(mockStudents);
+    return () => {};
+  }
+  return subscribeToCollection('students', [where('schoolId', '==', schoolId)], callback);
 }

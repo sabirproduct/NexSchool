@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '../components/layout/AppLayout';
 import { RouteGuard } from './RouteGuard';
@@ -14,8 +15,14 @@ import { HostelPage } from '../features/hostel/Page';
 import { NotificationsPage } from '../features/notifications/Page';
 import { ParentPage } from '../features/parent/Page';
 import { StudentPage } from '../features/student/Page';
+import { initializeFirestore } from '../services/firestoreSeed';
 
 export function App() {
+  useEffect(() => {
+    // Initialize Firestore on app startup
+    initializeFirestore().catch((err) => console.error('Firestore initialization error:', err));
+  }, []);
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
