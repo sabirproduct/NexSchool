@@ -1,5 +1,7 @@
 export type StudentType = 'day_scholar' | 'residential';
 export type StudentStatus = 'active' | 'inactive' | 'graduated' | 'transferred';
+export type StudentSortBy = 'name' | 'admissionDate' | 'rollNo';
+export type SortOrder = 'asc' | 'desc';
 
 export interface ParentInfo {
   fatherName: string;
@@ -21,4 +23,4 @@ export interface Student {
   parent: ParentInfo; academic: AcademicInfo; address: AddressInfo; hostel?: HostelInfo; status: StudentStatus; createdAt: string; updatedAt: string; createdBy: string;
 }
 export interface StudentDocument { id: string; studentId: string; label: string; url: string; mimeType: string; createdAt: string; }
-export interface StudentFilters { classId?: string; sectionId?: string; gender?: string; status?: StudentStatus; studentType?: StudentType; search?: string; }
+export interface StudentFilters { classId?: string; sectionId?: string; gender?: string; status?: StudentStatus; studentType?: StudentType; search?: string; sortBy?: StudentSortBy; sortOrder?: SortOrder; }
