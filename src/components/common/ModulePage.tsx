@@ -1,36 +1,31 @@
-import { Card, CardContent, Chip, Grid2, Stack, Typography } from '@mui/material';
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-
 export function ModulePage({ title, bullets }: { title: string; bullets: string[] }) {
   return (
-    <Stack spacing={3}>
-      <Stack spacing={1}>
-        <Typography variant="h4" fontWeight={700}>{title}</Typography>
-        <Typography variant="body1" color="text.secondary">
-          Track day-to-day operations with role-aware workflows and actionable insights.
-        </Typography>
-      </Stack>
+    <div className="row g-4">
+      <div className="col-12">
+        <div className="mb-3">
+          <h2 className="h4 fw-bold">{title}</h2>
+          <p className="text-muted mb-0">Track day-to-day operations with role-aware workflows and actionable insights.</p>
+        </div>
+      </div>
 
-      <Grid2 container spacing={2}>
-        {bullets.map((item) => (
-          <Grid2 size={{ xs: 12, md: 6 }} key={item}>
-            <Card variant="outlined" sx={{ borderRadius: 3 }}>
-              <CardContent>
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <CheckCircleRoundedIcon color="primary" />
-                  <Typography fontWeight={600}>{item}</Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid2>
-        ))}
-      </Grid2>
+      {bullets.map((item) => (
+        <div className="col-12 col-md-6" key={item}>
+          <div className="card border rounded-4 h-100 shadow-sm">
+            <div className="card-body d-flex align-items-center gap-3">
+              <div className="text-primary fs-4">✓</div>
+              <div className="fw-semibold">{item}</div>
+            </div>
+          </div>
+        </div>
+      ))}
 
-      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-        <Chip label="Material UI" color="primary" variant="outlined" />
-        <Chip label="MVP Ready" color="secondary" variant="outlined" />
-        <Chip label="Role-based" variant="outlined" />
-      </Stack>
-    </Stack>
+      <div className="col-12">
+        <div className="d-flex flex-wrap gap-2">
+          <span className="badge border border-primary text-primary bg-white">Bootstrap</span>
+          <span className="badge border border-secondary text-secondary bg-white">MVP Ready</span>
+          <span className="badge border border-secondary text-secondary bg-white">Role-based</span>
+        </div>
+      </div>
+    </div>
   );
 }

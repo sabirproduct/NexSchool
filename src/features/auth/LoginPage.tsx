@@ -1,5 +1,3 @@
-import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
-import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -17,31 +15,38 @@ export function LoginPage() {
   };
 
   return (
-    <Box
-      sx={{
-        display: 'grid',
-        placeItems: 'center',
-        minHeight: '100vh',
-        px: 2,
-        background: 'linear-gradient(145deg, #e8f0ff 0%, #f6f7fb 60%, #ffffff 100%)',
-      }}
+    <div
+      className="d-flex align-items-center justify-content-center min-vh-100 px-2"
+      style={{ background: 'linear-gradient(145deg, #e8f0ff 0%, #f6f7fb 60%, #ffffff 100%)' }}
     >
-      <Paper sx={{ p: 4, width: '100%', maxWidth: 420, borderRadius: 4 }} elevation={4}>
-        <Stack spacing={2.5}>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <LockRoundedIcon color="primary" />
-            <Typography variant="h5" fontWeight={700}>Sign in to NexSchool</Typography>
-          </Stack>
-          <Alert severity="info">Use any email/password for demo access.</Alert>
+      <div className="card shadow-sm" style={{ width: '100%', maxWidth: 420 }}>
+        <div className="card-body p-4">
+          <div className="d-flex align-items-center gap-3 mb-3">
+            <div className="rounded-circle bg-primary text-white d-inline-flex justify-content-center align-items-center" style={{ width: 38, height: 38 }}>
+              🔒
+            </div>
+            <div>
+              <h1 className="h5 mb-0">Sign in to NexSchool</h1>
+            </div>
+          </div>
+
+          <div className="alert alert-info">Use any email/password for demo access.</div>
+
           <form onSubmit={handleSubmit(onSubmit)}>
-            <TextField fullWidth margin="normal" label="Email" {...register('email', { required: true })} />
-            <TextField fullWidth margin="normal" label="Password" type="password" {...register('password', { required: true })} />
-            <Button fullWidth variant="contained" type="submit" size="large" sx={{ mt: 2 }}>
+            <div className="mb-3">
+              <label className="form-label">Email</label>
+              <input className="form-control" type="email" {...register('email', { required: true })} />
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Password</label>
+              <input className="form-control" type="password" {...register('password', { required: true })} />
+            </div>
+            <button type="submit" className="btn btn-primary btn-lg w-100">
               Continue
-            </Button>
+            </button>
           </form>
-        </Stack>
-      </Paper>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,6 +1,18 @@
-import { Paper, Stack, Typography } from '@mui/material';
 import { StudentResult } from '../types';
 
 export function ResultCard({ result }: { result: StudentResult }) {
-  return <Paper sx={{ p: 2 }}><Stack direction='row' justifyContent='space-between'><Typography fontWeight={700}>{result.studentName}</Typography><Typography>{result.status}</Typography></Stack><Typography variant='body2'>Percentage: {result.percentage}%</Typography><Typography variant='body2'>GPA: {result.gpa}</Typography><Typography variant='body2'>Final Grade: {result.finalGrade}</Typography><Typography variant='body2'>Rank: #{result.classRank}</Typography></Paper>;
+  return (
+    <div className="card shadow-sm h-100">
+      <div className="card-body">
+        <div className="d-flex justify-content-between align-items-start gap-3 mb-2">
+          <h3 className="h6 mb-0">{result.studentName}</h3>
+          <span className={`badge ${result.status === 'Published' ? 'bg-success' : 'bg-secondary'}`}>{result.status}</span>
+        </div>
+        <p className="mb-1 small">Percentage: {result.percentage}%</p>
+        <p className="mb-1 small">GPA: {result.gpa}</p>
+        <p className="mb-0 small">Final Grade: {result.finalGrade}</p>
+        <p className="mb-0 small">Rank: #{result.classRank}</p>
+      </div>
+    </div>
+  );
 }

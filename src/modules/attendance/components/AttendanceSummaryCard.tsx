@@ -1,12 +1,10 @@
-import { Card, CardContent, Typography } from '@mui/material';
-
 export function AttendanceSummaryCard({ title, value }: { title: string; value: string | number }) {
   return (
-    <Card className="rounded-2xl border border-slate-100 shadow-sm">
-      <CardContent>
-        <Typography variant="body2" color="text.secondary">{title}</Typography>
-        <Typography variant="h5" fontWeight={700}>{value}</Typography>
-      </CardContent>
-    </Card>
+    <div className="card border rounded-4 shadow-sm h-100">
+      <div className="card-body">
+        <p className="text-muted small mb-1">{title}</p>
+        <h3 className="h5 mb-0">{value}</h3>
+      </div>
+    </div>
   );
 }

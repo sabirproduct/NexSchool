@@ -1,4 +1,3 @@
-import { MenuItem, Select, Table, TableBody, TableCell, TableHead, TableRow, TextField } from '@mui/material';
 import { AttendanceStatusChip } from './AttendanceStatusChip';
 import { StudentAttendanceRecord } from '../types';
 
@@ -10,5 +9,48 @@ interface Props {
 }
 
 export function AttendanceTable({ rows, onStatusChange }: Props) {
-  return <Table stickyHeader size="small"><TableHead><TableRow><TableCell>Roll</TableCell><TableCell>Name</TableCell><TableCell>Status</TableCell><TableCell>Quick Edit</TableCell><TableCell>Remarks</TableCell></TableRow></TableHead><TableBody>{rows.map((r) => <TableRow key={r.attendanceId}><TableCell>{r.rollNumber}</TableCell><TableCell>{r.studentName}</TableCell><TableCell><AttendanceStatusChip status={r.status} /></TableCell><TableCell><Select size="small" value={r.status} onChange={(e) => onStatusChange(r.attendanceId, e.target.value as StudentAttendanceRecord['status'], r.remarks)}>{statuses.map((status) => <MenuItem key={status} value={status}>{status}</MenuItem>)}</Select></TableCell><TableCell><TextField size="small" value={r.remarks ?? ''} onChange={(e) => onStatusChange(r.attendanceId, r.status, e.target.value)} /></TableCell></TableRow>)}</TableBody></Table>;
+  return (
+    <div className="table-responsive">
+      <table className="table table-sm table-bordered align-middle mb-0">
+        <thead className="table-light">
+          <tr>
+            <th>Roll</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Quick Edit</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.attendanceId}>
+              <td>{r.rollNumber}</td>
+              <td>{r.studentName}</td>
+              <td><AttendanceStatusChip status={r.status} /></td>
+              <td>
+                <select
+                  className="form-select form-select-sm"
+                  value={r.status}
+                  onChange={(e) => onStatusChange(r.attendanceId, e.target.value as StudentAttendanceRecord['status'], r.remarks)}
+                >
+                  {statuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td>
+                <input
+                  className="form-control form-control-sm"
+                  value={r.remarks ?? ''}
+                  onChange={(e) => onStatusChange(r.attendanceId, r.status, e.target.value)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }

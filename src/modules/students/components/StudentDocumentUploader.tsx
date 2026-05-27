@@ -1,2 +1,11 @@
-import { Button, Stack, Typography } from '@mui/material';
-export function StudentDocumentUploader() { return <Stack spacing={1}><Typography variant="subtitle2">Document Upload (Firebase Storage placeholder)</Typography><Button variant="outlined" component="label">Upload<input hidden type="file" multiple /></Button></Stack>; }
+export function StudentDocumentUploader() {
+  return (
+    <div className="mb-3">
+      <div className="mb-2"><strong>Document Upload</strong> <span className="text-muted">(Firebase Storage placeholder)</span></div>
+      <button type="button" className="btn btn-outline-secondary btn-sm" aria-label="Upload documents">
+        Upload documents
+        <input type="file" hidden multiple />
+      </button>
+    </div>
+  );
+}

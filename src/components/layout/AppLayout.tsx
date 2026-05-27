@@ -1,107 +1,61 @@
-import {
-  AppBar,
-  Avatar,
-  Box,
-  Divider,
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Stack,
-  Toolbar,
-  Typography,
-} from '@mui/material';
-import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
-import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
-import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded';
-import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded';
-import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
-import QuizRoundedIcon from '@mui/icons-material/QuizRounded';
-import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded';
-import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded';
-import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
-import FamilyRestroomRoundedIcon from '@mui/icons-material/FamilyRestroomRounded';
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
-import { Outlet, Link, useLocation } from 'react-router-dom';
-
-const drawerWidth = 280;
+import { Link, Outlet, useLocation } from 'react-router-dom';
 
 const items = [
-  { label: 'Dashboard', to: '/dashboard', icon: <DashboardRoundedIcon /> },
-  { label: 'Students', to: '/students', icon: <SchoolRoundedIcon /> },
-  { label: 'Admissions', to: '/admissions', icon: <PersonAddAlt1RoundedIcon /> },
-  { label: 'Attendance', to: '/attendance', icon: <FactCheckRoundedIcon /> },
-  { label: 'Academics', to: '/academics', icon: <MenuBookRoundedIcon /> },
-  { label: 'Exams', to: '/exams', icon: <QuizRoundedIcon /> },
-  { label: 'Fees', to: '/fees', icon: <PaymentsRoundedIcon /> },
-  { label: 'Hostel', to: '/hostel', icon: <ApartmentRoundedIcon /> },
-  { label: 'Notifications', to: '/notifications', icon: <NotificationsRoundedIcon /> },
-  { label: 'Parent Portal', to: '/parent', icon: <FamilyRestroomRoundedIcon /> },
-  { label: 'Student Portal', to: '/student', icon: <PersonRoundedIcon /> },
+  { label: 'Dashboard', to: '/dashboard' },
+  { label: 'Students', to: '/students' },
+  { label: 'Admissions', to: '/admissions' },
+  { label: 'Attendance', to: '/attendance' },
+  { label: 'Academics', to: '/academics' },
+  { label: 'Exams', to: '/exams' },
+  { label: 'Fees', to: '/fees' },
+  { label: 'Hostel', to: '/hostel' },
+  { label: 'Notifications', to: '/notifications' },
+  { label: 'Parent Portal', to: '/parent' },
+  { label: 'Student Portal', to: '/student' },
 ];
 
 export function AppLayout() {
   const location = useLocation();
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar
-        position="fixed"
-        color="inherit"
-        elevation={0}
-        sx={{
-          borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-          ml: `${drawerWidth}px`,
-          width: `calc(100% - ${drawerWidth}px)`,
-        }}
-      >
-        <Toolbar>
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ flexGrow: 1 }}>
-            <Avatar sx={{ bgcolor: 'primary.main', width: 34, height: 34 }}>N</Avatar>
-            <Box>
-              <Typography variant="subtitle1" fontWeight={700}>NexSchool SMS</Typography>
-              <Typography variant="body2" color="text.secondary">School management workspace</Typography>
-            </Box>
-          </Stack>
-        </Toolbar>
-      </AppBar>
+    <div className="d-flex min-vh-100 bg-light">
+      <nav className="d-none d-lg-flex flex-column bg-white border-end p-3" style={{ width: 280 }}>
+        <div className="mb-4">
+          <div className="fs-5 fw-bold">Modules</div>
+        </div>
+        <div className="list-group">
+          {items.map((item) => {
+            const active = location.pathname === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`list-group-item list-group-item-action ${active ? 'active' : ''}`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
 
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: drawerWidth,
-            boxSizing: 'border-box',
-            borderRight: (theme) => `1px solid ${theme.palette.divider}`,
-          },
-        }}
-      >
-        <Toolbar>
-          <Typography variant="h6" fontWeight={700}>Modules</Typography>
-        </Toolbar>
-        <Divider />
-        <List sx={{ px: 1.5, py: 1 }}>
-          {items.map((item) => (
-            <ListItemButton
-              key={item.to}
-              component={Link}
-              to={item.to}
-              selected={location.pathname === item.to}
-              sx={{ borderRadius: 2, mb: 0.5 }}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          ))}
-        </List>
-      </Drawer>
+      <div className="flex-grow-1">
+        <header className="navbar navbar-light bg-white border-bottom px-3 py-2 d-flex justify-content-between align-items-center">
+          <div className="d-flex align-items-center gap-2">
+            <div className="rounded-circle bg-primary text-white d-inline-flex justify-content-center align-items-center" style={{ width: 34, height: 34 }}>
+              N
+            </div>
+            <div>
+              <div className="h6 mb-0">NexSchool SMS</div>
+              <small className="text-muted">School management workspace</small>
+            </div>
+          </div>
+        </header>
 
-      <Box component="main" sx={{ flexGrow: 1, mt: 10, p: 3, ml: `${drawerWidth}px` }}>
-        <Outlet />
-      </Box>
-    </Box>
+        <main className="container-fluid py-4">
+          <Outlet />
+        </main>
+      </div>
+    </div>
   );
 }

@@ -1,3 +1,12 @@
-import { Paper, Typography } from '@mui/material';
 import { StudentForm } from '../components/StudentForm';
-export function EditStudentPage() { return <Paper sx={{ p: 2 }}><Typography variant="h5" mb={2}>Edit Student</Typography><StudentForm mode="edit" onSubmit={async () => {}} /></Paper>; }
+
+export function EditStudentPage() {
+  return (
+    <div className="card shadow-sm">
+      <div className="card-body">
+        <h2 className="h5 mb-3">Edit Student</h2>
+        <StudentForm mode="edit" onSubmit={async () => {}} />
+      </div>
+    </div>
+  );
+}

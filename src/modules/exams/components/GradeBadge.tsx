@@ -1,6 +1,4 @@
-import { Chip } from '@mui/material';
-
 export function GradeBadge({ grade }: { grade: string }) {
-  const color = grade.startsWith('A') ? 'success' : grade.startsWith('B') ? 'primary' : grade === 'F' ? 'error' : 'warning';
-  return <Chip size='small' color={color} label={grade} />;
+  const colorClass = grade.startsWith('A') ? 'bg-success' : grade.startsWith('B') ? 'bg-primary' : grade === 'F' ? 'bg-danger' : 'bg-warning text-dark';
+  return <span className={`badge ${colorClass}`}>{grade}</span>;
 }

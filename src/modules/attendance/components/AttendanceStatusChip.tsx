@@ -1,16 +1,14 @@
-import { Chip } from '@mui/material';
-
-const colorMap: Record<string, 'success' | 'error' | 'warning' | 'info' | 'default'> = {
-  Present: 'success',
-  Absent: 'error',
-  Late: 'warning',
-  'Half Day': 'info',
-  Leave: 'default',
-  Missing: 'error',
-  Sick: 'warning',
-  'On Leave': 'default'
+const colorMap: Record<string, string> = {
+  Present: 'bg-success',
+  Absent: 'bg-danger',
+  Late: 'bg-warning text-dark',
+  'Half Day': 'bg-info text-dark',
+  Leave: 'bg-secondary',
+  Missing: 'bg-danger',
+  Sick: 'bg-warning text-dark',
+  'On Leave': 'bg-secondary',
 };
 
 export function AttendanceStatusChip({ status }: { status: string }) {
-  return <Chip label={status} color={colorMap[status] ?? 'default'} size="small" />;
+  return <span className={`badge ${colorMap[status] ?? 'bg-secondary'}`}>{status}</span>;
 }
