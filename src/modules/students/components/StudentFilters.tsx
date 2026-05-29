@@ -18,12 +18,12 @@ export function StudentFilters({ value, onChange }: { value: Filters; onChange: 
   const fields = ['classId', 'sectionId', 'gender', 'status', 'studentType'] as const;
 
   return (
-    <div className="row g-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       {fields.map((field) => (
-        <div key={field} className="col-12 col-sm-6 col-lg-2">
-          <label className="form-label text-capitalize">{field}</label>
+        <div key={field} className="space-y-2">
+          <label className="block text-sm font-medium text-slate-700 capitalize">{field}</label>
           <select
-            className="form-select form-select-sm"
+            className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-3 text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             value={(value as any)[field] ?? ''}
             onChange={(e) => onChange({ ...value, [field]: e.target.value || undefined })}
           >

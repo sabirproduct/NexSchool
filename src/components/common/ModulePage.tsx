@@ -1,30 +1,29 @@
 export function ModulePage({ title, bullets }: { title: string; bullets: string[] }) {
   return (
-    <div className="row g-4">
-      <div className="col-12">
-        <div className="mb-3">
-          <h2 className="h4 fw-bold">{title}</h2>
-          <p className="text-muted mb-0">Track day-to-day operations with role-aware workflows and actionable insights.</p>
-        </div>
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-3">{title}</h2>
+        <p className="text-gray-600 leading-relaxed">Track day-to-day operations with role-aware workflows and actionable insights.</p>
       </div>
 
-      {bullets.map((item) => (
-        <div className="col-12 col-md-6" key={item}>
-          <div className="card border rounded-4 h-100 shadow-sm">
-            <div className="card-body d-flex align-items-center gap-3">
-              <div className="text-primary fs-4">✓</div>
-              <div className="fw-semibold">{item}</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {bullets.map((item) => (
+          <div 
+            key={item}
+            className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-start gap-4">
+              <div className="text-green-500 text-xl font-bold pt-0.5 flex-shrink-0">✓</div>
+              <div className="font-semibold text-gray-900">{item}</div>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
-      <div className="col-12">
-        <div className="d-flex flex-wrap gap-2">
-          <span className="badge border border-primary text-primary bg-white">Bootstrap</span>
-          <span className="badge border border-secondary text-secondary bg-white">MVP Ready</span>
-          <span className="badge border border-secondary text-secondary bg-white">Role-based</span>
-        </div>
+      <div className="flex flex-wrap gap-3">
+        <span className="inline-block px-4 py-2 border border-blue-500 text-blue-700 bg-blue-50 rounded-full text-sm font-medium">Tailwind</span>
+        <span className="inline-block px-4 py-2 border border-gray-300 text-gray-700 bg-gray-50 rounded-full text-sm font-medium">MVP Ready</span>
+        <span className="inline-block px-4 py-2 border border-gray-300 text-gray-700 bg-gray-50 rounded-full text-sm font-medium">Role-based</span>
       </div>
     </div>
   );

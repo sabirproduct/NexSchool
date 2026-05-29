@@ -2,27 +2,28 @@ import { Student } from '../types';
 
 export function StudentCard({ student }: { student: Student }) {
   return (
-    <div className="card border rounded-4 shadow-sm">
-      <div className="card-body p-3 d-flex align-items-center gap-3">
-        <div
-          className="rounded-circle bg-secondary text-white d-flex justify-content-center align-items-center"
-          style={{ width: 42, height: 42, overflow: 'hidden' }}
-        >
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-4">
+        <div className="relative h-12 w-12 overflow-hidden rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-lg font-semibold">
           {student.photoUrl ? (
-            <img src={student.photoUrl} alt={student.fullName} className="w-100 h-100" style={{ objectFit: 'cover' }} />
+            <img src={student.photoUrl} alt={student.fullName} className="h-full w-full object-cover" />
           ) : (
-            <span className="fs-5">{student.firstName[0]}</span>
+            <span>{student.firstName[0]}</span>
           )}
         </div>
 
-        <div className="flex-fill">
-          <div className="fw-semibold">{student.fullName}</div>
-          <div className="text-muted small">
+        <div className="flex-1 min-w-0">
+          <div className="text-base font-semibold text-slate-900 truncate">{student.fullName}</div>
+          <div className="text-sm text-slate-500">
             {student.academic.classId}-{student.academic.sectionId} • {student.mobile}
           </div>
         </div>
 
-        <span className={`badge ${student.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>{student.status}</span>
+        <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${
+          student.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+        }`}>
+          {student.status}
+        </span>
       </div>
     </div>
   );
