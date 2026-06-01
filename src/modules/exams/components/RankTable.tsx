@@ -1,7 +1,36 @@
-import { Paper, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import { useExamStore } from '../store/useExamStore';
 
 export function RankTable() {
   const { results } = useExamStore();
-  return <Paper sx={{ p: 2 }}><Typography variant='h6' mb={1}>Ranking System</Typography><Table size='small'><TableHead><TableRow><TableCell>Student</TableCell><TableCell>Class Rank</TableCell><TableCell>Section Rank</TableCell><TableCell>Percentage</TableCell><TableCell>GPA</TableCell></TableRow></TableHead><TableBody>{results.sort((a,b)=>a.classRank-b.classRank).map((result)=><TableRow key={result.id}><TableCell>{result.studentName}</TableCell><TableCell>{result.classRank}</TableCell><TableCell>{result.sectionRank}</TableCell><TableCell>{result.percentage}%</TableCell><TableCell>{result.gpa}</TableCell></TableRow>)}</TableBody></Table></Paper>;
+  return (
+    <div className="card shadow-sm">
+      <div className="card-body">
+        <h3 className="h6 mb-3">Ranking System</h3>
+        <div className="table-responsive">
+          <table className="table table-sm table-bordered align-middle mb-0">
+            <thead className="table-light">
+              <tr>
+                <th>Student</th>
+                <th>Class Rank</th>
+                <th>Section Rank</th>
+                <th>Percentage</th>
+                <th>GPA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.slice().sort((a, b) => a.classRank - b.classRank).map((result) => (
+                <tr key={result.id}>
+                  <td>{result.studentName}</td>
+                  <td>{result.classRank}</td>
+                  <td>{result.sectionRank}</td>
+                  <td>{result.percentage}%</td>
+                  <td>{result.gpa}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 }

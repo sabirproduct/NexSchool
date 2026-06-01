@@ -1,7 +1,40 @@
-import { Chip, Paper, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import { useExamStore } from '../store/useExamStore';
 
 export function MarksEntryTable() {
   const { marks } = useExamStore();
-  return <Paper sx={{ p: 2 }}><Typography variant='h6' mb={1}>Marks Entry</Typography><Table size='small'><TableHead><TableRow><TableCell>Student</TableCell><TableCell>Roll</TableCell><TableCell>Subject</TableCell><TableCell>Marks</TableCell><TableCell>Grade</TableCell><TableCell>Status</TableCell></TableRow></TableHead><TableBody>{marks.map((mark)=><TableRow key={mark.id}><TableCell>{mark.studentName}</TableCell><TableCell>{mark.rollNumber}</TableCell><TableCell>{mark.subjectName}</TableCell><TableCell>{mark.obtainedMarks}/{mark.maximumMarks}</TableCell><TableCell>{mark.grade}</TableCell><TableCell><Chip size='small' label={mark.status} color={mark.status==='Present'?'success':'warning'} /></TableCell></TableRow>)}</TableBody></Table></Paper>;
+  return (
+    <div className="card shadow-sm">
+      <div className="card-body">
+        <h3 className="h6 mb-3">Marks Entry</h3>
+        <div className="table-responsive">
+          <table className="table table-sm table-bordered align-middle mb-0">
+            <thead className="table-light">
+              <tr>
+                <th>Student</th>
+                <th>Roll</th>
+                <th>Subject</th>
+                <th>Marks</th>
+                <th>Grade</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {marks.map((mark) => (
+                <tr key={mark.id}>
+                  <td>{mark.studentName}</td>
+                  <td>{mark.rollNumber}</td>
+                  <td>{mark.subjectName}</td>
+                  <td>{mark.obtainedMarks}/{mark.maximumMarks}</td>
+                  <td>{mark.grade}</td>
+                  <td>
+                    <span className={`badge ${mark.status === 'Present' ? 'bg-success' : 'bg-warning text-dark'}`}>{mark.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 }

@@ -1,4 +1,3 @@
-import { MenuItem, Stack, TextField } from '@mui/material';
 import { AdmissionStatus, StudentType } from '../types';
 
 interface Props {
@@ -8,21 +7,36 @@ interface Props {
   onType: (value: StudentType | '') => void;
 }
 
+const statusOptions: Array<AdmissionStatus | ''> = ['', 'Draft', 'Submitted', 'Under Review', 'Approved', 'Rejected', 'Waiting List', 'Enrolled'];
+
 export function AdmissionFilters({ search, onSearch, onStatus, onType }: Props) {
   return (
-    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-      <TextField size="small" fullWidth label="Search" value={search} onChange={(e) => onSearch(e.target.value)} />
-      <TextField size="small" select label="Status" defaultValue="" onChange={(e) => onStatus(e.target.value as AdmissionStatus | '')}>
-        <MenuItem value="">All</MenuItem>
-        {['Draft', 'Submitted', 'Under Review', 'Approved', 'Rejected', 'Waiting List', 'Enrolled'].map((status) => (
-          <MenuItem key={status} value={status}>{status}</MenuItem>
-        ))}
-      </TextField>
-      <TextField size="small" select label="Student Type" defaultValue="" onChange={(e) => onType(e.target.value as StudentType | '')}>
-        <MenuItem value="">All</MenuItem>
-        <MenuItem value="Day Scholar">Day Scholar</MenuItem>
-        <MenuItem value="Residential">Residential</MenuItem>
-      </TextField>
-    </Stack>
+    <div className="row g-3">
+      <div className="col-12 col-md-4">
+        <label className="form-label">Search</label>
+        <input
+          className="form-control form-control-sm"
+          type="search"
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+        />
+      </div>
+      <div className="col-12 col-md-4">
+        <label className="form-label">Status</label>
+        <select className="form-select form-select-sm" defaultValue="" onChange={(e) => onStatus(e.target.value as AdmissionStatus | '')}>
+          {statusOptions.map((status) => (
+            <option key={status || 'all'} value={status}> {status || 'All'} </option>
+          ))}
+        </select>
+      </div>
+      <div className="col-12 col-md-4">
+        <label className="form-label">Student Type</label>
+        <select className="form-select form-select-sm" defaultValue="" onChange={(e) => onType(e.target.value as StudentType | '')}>
+          <option value="">All</option>
+          <option value="Day Scholar">Day Scholar</option>
+          <option value="Residential">Residential</option>
+        </select>
+      </div>
+    </div>
   );
 }

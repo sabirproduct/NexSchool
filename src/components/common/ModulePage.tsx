@@ -1,36 +1,30 @@
-import { Card, CardContent, Chip, Grid2, Stack, Typography } from '@mui/material';
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-
 export function ModulePage({ title, bullets }: { title: string; bullets: string[] }) {
   return (
-    <Stack spacing={3}>
-      <Stack spacing={1}>
-        <Typography variant="h4" fontWeight={700}>{title}</Typography>
-        <Typography variant="body1" color="text.secondary">
-          Track day-to-day operations with role-aware workflows and actionable insights.
-        </Typography>
-      </Stack>
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-3">{title}</h2>
+        <p className="text-gray-600 leading-relaxed">Track day-to-day operations with role-aware workflows and actionable insights.</p>
+      </div>
 
-      <Grid2 container spacing={2}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {bullets.map((item) => (
-          <Grid2 size={{ xs: 12, md: 6 }} key={item}>
-            <Card variant="outlined" sx={{ borderRadius: 3 }}>
-              <CardContent>
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <CheckCircleRoundedIcon color="primary" />
-                  <Typography fontWeight={600}>{item}</Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid2>
+          <div 
+            key={item}
+            className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-start gap-4">
+              <div className="text-green-500 text-xl font-bold pt-0.5 flex-shrink-0">✓</div>
+              <div className="font-semibold text-gray-900">{item}</div>
+            </div>
+          </div>
         ))}
-      </Grid2>
+      </div>
 
-      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-        <Chip label="Material UI" color="primary" variant="outlined" />
-        <Chip label="MVP Ready" color="secondary" variant="outlined" />
-        <Chip label="Role-based" variant="outlined" />
-      </Stack>
-    </Stack>
+      <div className="flex flex-wrap gap-3">
+        <span className="inline-block px-4 py-2 border border-blue-500 text-blue-700 bg-blue-50 rounded-full text-sm font-medium">Tailwind</span>
+        <span className="inline-block px-4 py-2 border border-gray-300 text-gray-700 bg-gray-50 rounded-full text-sm font-medium">MVP Ready</span>
+        <span className="inline-block px-4 py-2 border border-gray-300 text-gray-700 bg-gray-50 rounded-full text-sm font-medium">Role-based</span>
+      </div>
+    </div>
   );
 }

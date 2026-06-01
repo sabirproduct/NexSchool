@@ -1,5 +1,14 @@
-import { Button, Paper, Stack, Typography } from '@mui/material';
-
 export function ReportCardGenerator() {
-  return <Paper sx={{ p: 2 }}><Typography variant='h6' mb={1}>Report Card Generator</Typography><Stack direction='row' spacing={1}><Button variant='contained'>Generate PDF</Button><Button variant='outlined'>Print</Button><Button variant='text'>QR Verify (Placeholder)</Button></Stack></Paper>;
+  return (
+    <div className="card shadow-sm">
+      <div className="card-body">
+        <h3 className="h6 mb-3">Report Card Generator</h3>
+        <div className="d-flex flex-wrap gap-2">
+          <button type="button" className="btn btn-primary btn-sm">Generate PDF</button>
+          <button type="button" className="btn btn-outline-secondary btn-sm">Print</button>
+          <button type="button" className="btn btn-link btn-sm">QR Verify (Placeholder)</button>
+        </div>
+      </div>
+    </div>
+  );
 }

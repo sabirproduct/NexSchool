@@ -1,16 +1,15 @@
-import { Chip } from '@mui/material';
 import { AdmissionStatus } from '../types';
 
-const colorMap: Record<AdmissionStatus, 'default' | 'success' | 'error' | 'warning' | 'info'> = {
-  Draft: 'default',
-  Submitted: 'info',
-  'Under Review': 'warning',
-  Approved: 'success',
-  Rejected: 'error',
-  'Waiting List': 'warning',
-  Enrolled: 'success'
+const colorMap: Record<AdmissionStatus, string> = {
+  Draft: 'bg-secondary',
+  Submitted: 'bg-info text-dark',
+  'Under Review': 'bg-warning text-dark',
+  Approved: 'bg-success',
+  Rejected: 'bg-danger',
+  'Waiting List': 'bg-warning text-dark',
+  Enrolled: 'bg-success'
 };
 
 export function AdmissionStatusBadge({ status }: { status: AdmissionStatus }) {
-  return <Chip size="small" label={status} color={colorMap[status]} />;
+  return <span className={`badge ${colorMap[status]}`}>{status}</span>;
 }

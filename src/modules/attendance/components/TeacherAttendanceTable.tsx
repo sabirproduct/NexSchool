@@ -1,7 +1,31 @@
-import { Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
-import { TeacherAttendanceRecord } from '../types';
 import { AttendanceStatusChip } from './AttendanceStatusChip';
+import { TeacherAttendanceRecord } from '../types';
 
 export function TeacherAttendanceTable({ rows }: { rows: TeacherAttendanceRecord[] }) {
-  return <Table size="small"><TableHead><TableRow><TableCell>Name</TableCell><TableCell>Type</TableCell><TableCell>Status</TableCell><TableCell>Check-in</TableCell><TableCell>Check-out</TableCell></TableRow></TableHead><TableBody>{rows.map((r)=><TableRow key={r.attendanceId}><TableCell>{r.teacherName}</TableCell><TableCell>{r.staffType}</TableCell><TableCell><AttendanceStatusChip status={r.status} /></TableCell><TableCell>{r.checkIn ?? '-'}</TableCell><TableCell>{r.checkOut ?? '-'}</TableCell></TableRow>)}</TableBody></Table>;
+  return (
+    <div className="table-responsive">
+      <table className="table table-sm table-bordered align-middle mb-0">
+        <thead className="table-light">
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Check-in</th>
+            <th>Check-out</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.attendanceId}>
+              <td>{r.teacherName}</td>
+              <td>{r.staffType}</td>
+              <td><AttendanceStatusChip status={r.status} /></td>
+              <td>{r.checkIn ?? '-'}</td>
+              <td>{r.checkOut ?? '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }

@@ -1,5 +1,3 @@
-import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
-import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -17,31 +15,54 @@ export function LoginPage() {
   };
 
   return (
-    <Box
-      sx={{
-        display: 'grid',
-        placeItems: 'center',
-        minHeight: '100vh',
-        px: 2,
-        background: 'linear-gradient(145deg, #e8f0ff 0%, #f6f7fb 60%, #ffffff 100%)',
-      }}
+    <div
+      className="flex items-center justify-center min-h-screen px-4 bg-gradient-to-br from-blue-50 via-white to-slate-100"
+      style={{ minHeight: '100vh' }}
     >
-      <Paper sx={{ p: 4, width: '100%', maxWidth: 420, borderRadius: 4 }} elevation={4}>
-        <Stack spacing={2.5}>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <LockRoundedIcon color="primary" />
-            <Typography variant="h5" fontWeight={700}>Sign in to NexSchool</Typography>
-          </Stack>
-          <Alert severity="info">Use any email/password for demo access.</Alert>
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <TextField fullWidth margin="normal" label="Email" {...register('email', { required: true })} />
-            <TextField fullWidth margin="normal" label="Password" type="password" {...register('password', { required: true })} />
-            <Button fullWidth variant="contained" type="submit" size="large" sx={{ mt: 2 }}>
+      <div className="w-full max-w-md bg-white rounded-[28px] shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center text-xl shadow-lg">
+              🔒
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">Sign in to NexSchool</h1>
+              <p className="text-sm text-slate-500 mt-1">School management workspace</p>
+            </div>
+          </div>
+
+          <div className="p-4 mb-6 bg-blue-50 border border-blue-200 rounded-2xl">
+            <p className="text-sm text-blue-800">Use any email/password for demo access.</p>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+              <input
+                className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                type="email"
+                placeholder="Enter your email"
+                {...register('email', { required: true })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+              <input
+                className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                type="password"
+                placeholder="Enter your password"
+                {...register('password', { required: true })}
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-2xl transition-colors"
+            >
               Continue
-            </Button>
+            </button>
           </form>
-        </Stack>
-      </Paper>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 }

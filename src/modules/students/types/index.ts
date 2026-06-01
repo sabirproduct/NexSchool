@@ -20,7 +20,7 @@ export interface HostelInfo { hostelName: string; roomNo: string; bedNo: string;
 export interface Student {
   id: string; firstName: string; lastName: string; fullName: string; gender: 'male'|'female'|'other'; dob: string; bloodGroup?: string;
   religion?: string; category?: string; aadhaarNo?: string; mobile: string; email?: string; photoUrl?: string;
-  parent: ParentInfo; academic: AcademicInfo; address: AddressInfo; hostel?: HostelInfo; status: StudentStatus; createdAt: string; updatedAt: string; createdBy: string;
+  schoolId?: string; parent: ParentInfo; academic: AcademicInfo; address: AddressInfo; hostel?: HostelInfo; status: StudentStatus; createdAt: string; updatedAt: string; createdBy: string;
 }
 export interface StudentDocument { id: string; studentId: string; label: string; url: string; mimeType: string; createdAt: string; }
 export interface StudentFilters { classId?: string; sectionId?: string; gender?: string; status?: StudentStatus; studentType?: StudentType; search?: string; sortBy?: StudentSortBy; sortOrder?: SortOrder; }

@@ -1,6 +1,3 @@
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-import { Card, CardContent, Grid2, Stack, Typography } from '@mui/material';
-
 type FeeSection = {
   title: string;
   items: string[];
@@ -27,39 +24,33 @@ const feeSections: FeeSection[] = [
 
 export function FeesPage() {
   return (
-    <Stack spacing={3}>
-      <Stack spacing={1}>
-        <Typography variant="h4" fontWeight={700}>
-          Fees &amp; Payment Module
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Manage school fee structures, track dues, and monitor collection performance across payment channels.
-        </Typography>
-      </Stack>
+    <div className="row g-4">
+      <div className="col-12">
+        <div className="mb-3">
+          <h2 className="h4 fw-bold">Fees & Payment Module</h2>
+          <p className="text-muted mb-0">
+            Manage school fee structures, track dues, and monitor collection performance across payment channels.
+          </p>
+        </div>
+      </div>
 
-      <Grid2 container spacing={2}>
-        {feeSections.map((section) => (
-          <Grid2 size={{ xs: 12, md: 6 }} key={section.title}>
-            <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
-              <CardContent>
-                <Stack spacing={1.5}>
-                  <Typography variant="h6" fontWeight={600}>
-                    {section.title}
-                  </Typography>
-                  <Stack spacing={1}>
-                    {section.items.map((item) => (
-                      <Stack direction="row" spacing={1} alignItems="center" key={item}>
-                        <CheckCircleRoundedIcon color="primary" fontSize="small" />
-                        <Typography variant="body2">{item}</Typography>
-                      </Stack>
-                    ))}
-                  </Stack>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid2>
-        ))}
-      </Grid2>
-    </Stack>
+      {feeSections.map((section) => (
+        <div className="col-12 col-md-6" key={section.title}>
+          <div className="card border rounded-4 shadow-sm h-100">
+            <div className="card-body">
+              <h3 className="h6 fw-semibold">{section.title}</h3>
+              <ul className="list-unstyled mb-0 mt-3">
+                {section.items.map((item) => (
+                  <li key={item} className="d-flex align-items-start gap-2 mb-2">
+                    <span className="text-primary">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

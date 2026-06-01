@@ -1,5 +1,6 @@
 import { FirebaseOptions, initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAnalytics } from 'firebase/analytics';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,5 +14,7 @@ const firebaseConfig: FirebaseOptions = {
 
 const hasConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId);
 const app = hasConfig ? initializeApp(firebaseConfig) : null;
+const analytics = app ? getAnalytics(app) : null;
 
 export const db = app ? getFirestore(app) : null;
+export { analytics };

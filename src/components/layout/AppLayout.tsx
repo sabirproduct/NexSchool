@@ -1,107 +1,127 @@
-import {
-  AppBar,
-  Avatar,
-  Box,
-  Divider,
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Stack,
-  Toolbar,
-  Typography,
-} from '@mui/material';
-import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
-import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
-import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded';
-import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded';
-import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
-import QuizRoundedIcon from '@mui/icons-material/QuizRounded';
-import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded';
-import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded';
-import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
-import FamilyRestroomRoundedIcon from '@mui/icons-material/FamilyRestroomRounded';
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
 
-const drawerWidth = 280;
+const sidebarWidth = 280;
 
 const items = [
-  { label: 'Dashboard', to: '/dashboard', icon: <DashboardRoundedIcon /> },
-  { label: 'Students', to: '/students', icon: <SchoolRoundedIcon /> },
-  { label: 'Admissions', to: '/admissions', icon: <PersonAddAlt1RoundedIcon /> },
-  { label: 'Attendance', to: '/attendance', icon: <FactCheckRoundedIcon /> },
-  { label: 'Academics', to: '/academics', icon: <MenuBookRoundedIcon /> },
-  { label: 'Exams', to: '/exams', icon: <QuizRoundedIcon /> },
-  { label: 'Fees', to: '/fees', icon: <PaymentsRoundedIcon /> },
-  { label: 'Hostel', to: '/hostel', icon: <ApartmentRoundedIcon /> },
-  { label: 'Notifications', to: '/notifications', icon: <NotificationsRoundedIcon /> },
-  { label: 'Parent Portal', to: '/parent', icon: <FamilyRestroomRoundedIcon /> },
-  { label: 'Student Portal', to: '/student', icon: <PersonRoundedIcon /> },
+  { label: 'Dashboard', to: '/dashboard' },
+  { label: 'Students', to: '/students' },
+  { label: 'Admissions', to: '/admissions' },
+  { label: 'Attendance', to: '/attendance' },
+  { label: 'Academics', to: '/academics' },
+  { label: 'Exams', to: '/exams' },
+  { label: 'Fees', to: '/fees' },
+  { label: 'Hostel', to: '/hostel' },
+  { label: 'Notifications', to: '/notifications' },
+  { label: 'Parent Portal', to: '/parent' },
+  { label: 'Student Portal', to: '/student' },
 ];
 
 export function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const setUser = useAuthStore((s) => s.setUser);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  const handleLogout = () => {
+    setUser(null);
+    navigate('/login');
+  };
+
+  const navList = (
+    <>
+      <div className="mb-6 flex items-center justify-between w-full">
+        <div className="text-lg font-bold text-gray-900">NexSchool</div>
+        <button
+          type="button"
+          className="lg:hidden inline-flex items-center justify-center w-8 h-8 rounded-md text-gray-600 hover:bg-gray-200 transition-colors"
+          onClick={() => setMobileNavOpen(false)}
+          aria-label="Close navigation"
+        >
+          ×
+        </button>
+      </div>
+      <nav className="space-y-1">
+        {items.map((item) => {
+          const active = location.pathname === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`block px-4 py-3 rounded-lg font-medium transition-all ${
+                active
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+              onClick={() => setMobileNavOpen(false)}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <button
+        type="button"
+        className="mt-6 w-full rounded-lg bg-red-600 text-white py-3 text-sm font-semibold hover:bg-red-700 transition-colors"
+        onClick={handleLogout}
+      >
+        Logout
+      </button>
+    </>
+  );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar
-        position="fixed"
-        color="inherit"
-        elevation={0}
-        sx={{
-          borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-          ml: `${drawerWidth}px`,
-          width: `calc(100% - ${drawerWidth}px)`,
-        }}
-      >
-        <Toolbar>
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ flexGrow: 1 }}>
-            <Avatar sx={{ bgcolor: 'primary.main', width: 34, height: 34 }}>N</Avatar>
-            <Box>
-              <Typography variant="subtitle1" fontWeight={700}>NexSchool SMS</Typography>
-              <Typography variant="body2" color="text.secondary">School management workspace</Typography>
-            </Box>
-          </Stack>
-        </Toolbar>
-      </AppBar>
+    <div className="flex min-h-screen bg-gray-50">
+      <nav className="hidden lg:flex flex-col flex-shrink-0 bg-white border-r border-gray-200 p-6 shadow-sm" style={{ width: sidebarWidth }}>
+        {navList}
+      </nav>
 
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: drawerWidth,
-            boxSizing: 'border-box',
-            borderRight: (theme) => `1px solid ${theme.palette.divider}`,
-          },
-        }}
-      >
-        <Toolbar>
-          <Typography variant="h6" fontWeight={700}>Modules</Typography>
-        </Toolbar>
-        <Divider />
-        <List sx={{ px: 1.5, py: 1 }}>
-          {items.map((item) => (
-            <ListItemButton
-              key={item.to}
-              component={Link}
-              to={item.to}
-              selected={location.pathname === item.to}
-              sx={{ borderRadius: 2, mb: 0.5 }}
+      {mobileNavOpen && (
+        <>
+          <div
+            className="fixed top-0 left-0 h-screen bg-white border-r border-gray-200 p-6 shadow-xl lg:hidden flex-shrink-0 z-50"
+            style={{ width: sidebarWidth }}
+          >
+            {navList}
+          </div>
+          <div
+            className="fixed top-0 left-0 w-full h-full bg-black/25 lg:hidden z-40"
+            onClick={() => setMobileNavOpen(false)}
+          />
+        </>
+      )}
+
+      <div className="flex-grow">
+        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200 bg-white gap-3">
+          <h1 className="text-2xl font-bold text-gray-900">NexSchool SMS</h1>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="hidden lg:inline-flex items-center justify-center rounded-lg bg-red-50 text-red-700 border border-red-200 px-4 py-2 text-sm font-medium hover:bg-red-100 transition-colors"
+              onClick={handleLogout}
             >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          ))}
-        </List>
-      </Drawer>
+              Logout
+            </button>
+            <button
+              type="button"
+              className="lg:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+              onClick={() => setMobileNavOpen((open) => !open)}
+              aria-label="Open navigation"
+            >
+              ☰
+            </button>
+          </div>
+        </div>
 
-      <Box component="main" sx={{ flexGrow: 1, mt: 10, p: 3, ml: `${drawerWidth}px` }}>
-        <Outlet />
-      </Box>
-    </Box>
+        <main className="p-8">
+          <Outlet />
+        </main>
+      </div>
+    </div>
   );
 }
