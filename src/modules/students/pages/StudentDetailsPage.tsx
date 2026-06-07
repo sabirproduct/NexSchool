@@ -4,30 +4,65 @@ import { StudentProfileHeader } from '../components/StudentProfileHeader';
 import { getStudentById } from '../services/studentService';
 import { Student } from '../types';
 
+/** Extended student data with binary fields stored from admission form */
+interface StudentWithBinaries extends Student {
+  photoBinary?: string;
+  documentsBinary?: Record<string, string>;
+}
+
 export function StudentDetailsPage() {
   const { id = '' } = useParams();
-  const [student, setStudent] = useState<Student | null>(null);
+  const [student, setStudent] = useState<StudentWithBinaries | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<string | null>(null);
 
   useEffect(() => {
-    getStudentById(id).then((s) => setStudent(s ?? null));
+    getStudentById(id).then((s) => {
+      if (s) {
+        // Cast to include binary fields that may have been saved to Firestore
+        setStudent(s as StudentWithBinaries);
+      } else {
+        setStudent(null);
+      }
+    });
   }, [id]);
 
-  const documents = useMemo(
-    () => [
-      { label: 'Birth Certificate', url: '#' },
-      { label: 'Transfer Certificate', url: '#' },
-      { label: 'Aadhaar (placeholder)', url: '#' },
-      { label: 'Previous Marksheet', url: '#' },
-      { label: 'Other Documents', url: '#' },
-    ],
-    []
-  );
+  // Extract document labels from binary data
+  const documents = useMemo(() => {
+    if (!student) return [];
+    const docs: { label: string; src?: string }[] = [];
+    const binaries = (student as any).documentsBinary as Record<string, string> | undefined;
+    if (binaries) {
+      if (binaries.birthCertificate) docs.push({ label: 'Birth Certificate', src: binaries.birthCertificate });
+      if (binaries.transferCertificate) docs.push({ label: 'Transfer Certificate', src: binaries.transferCertificate });
+      if (binaries.aadhaar) docs.push({ label: 'Aadhaar Card', src: binaries.aadhaar });
+      if (binaries.previousMarksheet) docs.push({ label: 'Previous Marksheet', src: binaries.previousMarksheet });
+      if (binaries.otherDocuments) docs.push({ label: 'Other Documents', src: binaries.otherDocuments });
+    }
+    // Always show placeholder entries if no binaries
+    if (docs.length === 0) {
+      ['Birth Certificate', 'Transfer Certificate', 'Aadhaar Card', 'Previous Marksheet', 'Other Documents'].forEach((label) => {
+        docs.push({ label });
+      });
+    }
+    return docs;
+  }, [student]);
 
-  if (!student) return <div className="p-3">Student not found.</div>;
+  const photoBinary = student ? (student as any).photoBinary as string | undefined : undefined;
+
+  if (!student) return (
+    <div className="d-flex justify-content-center align-items-center p-5">
+      <div className="text-center">
+        <div className="spinner-border text-primary mb-3" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <p className="text-muted">Loading student data...</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="container-fluid p-0">
-      <StudentProfileHeader student={student} />
+      <StudentProfileHeader student={student} photoBinary={photoBinary} />
       <div className="row g-3">
         <div className="col-12 col-md-6">
           <InfoCard title="Personal Info" rows={[
@@ -44,14 +79,21 @@ export function StudentDetailsPage() {
         <div className="col-12 col-md-6">
           <InfoCard title="Academic Info" rows={[
             ['Admission Number', student.academic.admissionNo], ['Roll Number', student.academic.rollNo], ['Admission Date', student.academic.admissionDate], ['Class', student.academic.classId],
-            ['Section', student.academic.sectionId], ['Session', student.academic.session], ['Previous School', student.academic.previousSchool || '-'], ['Student Type', student.academic.studentType],
+            ['Section', student.academic.sectionId], ['Session', student.academic.session], ['Previous School', student.academic.previousSchool || '-'], ['Student Type', student.academic.studentType === 'residential' ? 'Residential' : 'Day Scholar'],
+          ]} />
+        </div>
+        <div className="col-12 col-md-6">
+          <InfoCard title="Aadhaar & Contact" rows={[
+            ['Aadhaar No', student.aadhaarNo || '-'],
+            ['Address', student.address.addressLine],
+            ['State', student.address.state],
+            ['District', student.address.district],
+            ['City', student.address.city],
+            ['Pin Code', student.address.pinCode],
           ]} />
         </div>
         <div className="col-12 col-md-6">
           <InfoCard title="Attendance Summary" rows={[['Present Days', 'Placeholder'], ['Absent Days', 'Placeholder'], ['Attendance %', 'Placeholder']]} />
-        </div>
-        <div className="col-12 col-md-6">
-          <InfoCard title="Fees Summary" rows={[['Outstanding', 'Placeholder'], ['Last Payment', 'Placeholder'], ['Status', 'Placeholder']]} />
         </div>
         <div className="col-12 col-md-6">
           <InfoCard title="Hostel Info" rows={student.hostel ? [
@@ -62,18 +104,56 @@ export function StudentDetailsPage() {
           <div className="card shadow-sm">
             <div className="card-body">
               <h3 className="h6 mb-3">Uploaded Documents</h3>
-              <ul className="list-group list-group-flush">
+              <div className="row g-3">
                 {documents.map((doc) => (
-                  <li className="list-group-item d-flex justify-content-between align-items-center" key={doc.label}>
-                    <span>{doc.label}</span>
-                    <Link to={doc.url} className="btn btn-sm btn-link">View</Link>
-                  </li>
+                  <div className="col-12 col-sm-6 col-md-4 col-lg-3" key={doc.label}>
+                    <div className="border rounded-2 p-2 text-center">
+                      {doc.src ? (
+                        <img
+                          src={doc.src}
+                          alt={doc.label}
+                          className="img-fluid rounded mb-2 cursor-pointer"
+                          style={{ maxHeight: 150, objectFit: 'contain', cursor: 'pointer' }}
+                          onClick={() => setPreviewDoc(doc.src!)}
+                        />
+                      ) : (
+                        <div className="d-flex align-items-center justify-content-center bg-light rounded mb-2" style={{ height: 120 }}>
+                          <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                      <p className="small mb-0 text-truncate">{doc.label}</p>
+                      {!doc.src && <span className="badge bg-secondary mt-1">Not uploaded</span>}
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Document Preview Modal */}
+      {previewDoc && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ zIndex: 1050, backgroundColor: 'rgba(0,0,0,0.7)' }}
+          onClick={() => setPreviewDoc(null)}
+        >
+          <div className="position-relative" style={{ maxWidth: '90vw', maxHeight: '90vh' }}>
+            <button
+              type="button"
+              className="position-absolute top-0 end-0 btn btn-sm btn-dark rounded-circle m-2"
+              onClick={() => setPreviewDoc(null)}
+              style={{ zIndex: 1 }}
+            >
+              ×
+            </button>
+            <img src={previewDoc} alt="Document Preview" className="img-fluid" style={{ maxHeight: '85vh' }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

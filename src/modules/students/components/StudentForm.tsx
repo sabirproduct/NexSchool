@@ -1,9 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { validateStudentPayload } from '../schemas/studentSchema';
 import { isValidEmail, isValidMobile } from '../utils/validation';
+import { generateAdmissionNo } from '../services/studentService';
+import { fetchDropdownData, ClassOption, SectionOption, SessionOption } from '../services/dropdownService';
+import { useAuthStore } from '../../../store/authStore';
+import indiaStates from '../data/india-states.json';
 
 const steps = ['Basic Information', 'Parent Information', 'Academic Information', 'Address Information', 'Hostel Information', 'Document Upload'];
+
+/** File preview entry with binary data */
+export interface FilePreview {
+  file: File;
+  previewUrl: string;
+  binaryData: ArrayBuffer | null;
+}
 
 export type StudentAdmissionFormValues = {
   firstName: string;
@@ -17,6 +28,8 @@ export type StudentAdmissionFormValues = {
   mobile: string;
   email?: string;
   photo?: FileList;
+  /** Binary data for photo (stored as base64 for Firestore) */
+  photoBinary?: string;
   parent: {
     fatherName: string;
     motherName: string;
@@ -57,24 +70,231 @@ export type StudentAdmissionFormValues = {
     previousMarksheet?: FileList;
     otherDocuments?: FileList;
   };
+  /** Binary data for documents (keyed by label, base64 encoded) */
+  documentsBinary?: Record<string, string>;
 };
+
+const statesList = Object.keys(indiaStates);
+
+/** Read a file and return its base64 string */
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // result is a data URL like "data:image/png;base64,..."
+      resolve(result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 export function StudentForm({ defaultValues, onSubmit, mode }: { defaultValues?: Partial<StudentAdmissionFormValues>; onSubmit: (v: StudentAdmissionFormValues) => Promise<void> | void; mode: 'create' | 'edit' }) {
   const [step, setStep] = useState(0);
   const [formError, setFormError] = useState('');
-  const { register, handleSubmit, watch, trigger, formState: { errors } } = useForm<StudentAdmissionFormValues>({ defaultValues: defaultValues as StudentAdmissionFormValues });
+  const [admissionNoLoading, setAdmissionNoLoading] = useState(false);
+  const [previews, setPreviews] = useState<Record<string, FilePreview>>({});
+  const { register, handleSubmit, watch, trigger, setValue, getValues, formState: { errors } } = useForm<StudentAdmissionFormValues>({ defaultValues: defaultValues as StudentAdmissionFormValues });
   const studentType = watch('academic.studentType', defaultValues?.academic?.studentType ?? 'day_scholar');
+  const selectedState = watch('address.state', defaultValues?.address?.state ?? '');
+  const selectedDistrict = watch('address.district', defaultValues?.address?.district ?? '');
+
+  const schoolId = useAuthStore((s) => s.user?.schoolId);
+
+  // Load dynamic dropdown data from Firestore
+  const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
+  const [sectionOptions, setSectionOptions] = useState<SectionOption[]>([]);
+  const [sessionOptions, setSessionOptions] = useState<SessionOption[]>([]);
+
+  useEffect(() => {
+    fetchDropdownData(schoolId).then((data) => {
+      setClassOptions(data.classes);
+      setSectionOptions(data.sections);
+      setSessionOptions(data.sessions);
+    });
+  }, [schoolId]);
+
+  // Generate admission number on mount for create mode
+  useEffect(() => {
+    if (mode === 'create') {
+      setAdmissionNoLoading(true);
+      generateAdmissionNo().then((no) => {
+        setValue('academic.admissionNo', no);
+        setAdmissionNoLoading(false);
+      });
+    }
+  }, [mode, setValue]);
+
+  // Get districts for selected state
+  const districtsForState = useMemo(() => {
+    if (!selectedState || !indiaStates[selectedState as keyof typeof indiaStates]) return [];
+    return Object.keys(indiaStates[selectedState as keyof typeof indiaStates].districts);
+  }, [selectedState]);
+
+  // Get cities for selected state+district
+  const citiesForDistrict = useMemo(() => {
+    if (!selectedState || !selectedDistrict) return [];
+    const stateData = indiaStates[selectedState as keyof typeof indiaStates];
+    if (!stateData) return [];
+    const districtCities = stateData.districts[selectedDistrict as keyof typeof stateData.districts];
+    return districtCities || [];
+  }, [selectedState, selectedDistrict]);
+
+  // Reset district/city when state changes
+  const handleStateChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setValue('address.state', e.target.value);
+    setValue('address.district', '');
+    setValue('address.city', '');
+  }, [setValue]);
+
+  // Reset city when district changes
+  const handleDistrictChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setValue('address.district', e.target.value);
+    setValue('address.city', '');
+  }, [setValue]);
+
+  /** Handle file selection for a field - creates preview and reads binary data */
+  const handleFileChange = useCallback(async (fieldName: string, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    // Create preview URL for images
+    const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+    let binaryData: ArrayBuffer | null = null;
+
+    try {
+      binaryData = await file.arrayBuffer();
+    } catch {
+      // Could not read binary
+    }
+
+    const preview: FilePreview = { file, previewUrl, binaryData };
+
+    setPreviews((prev) => ({ ...prev, [fieldName]: preview }));
+
+    // Store base64 data in the form for Firestore
+    if (file.type.startsWith('image/')) {
+      const base64 = await readFileAsBase64(file);
+      if (fieldName === 'photo') {
+        setValue('photoBinary' as any, base64);
+      } else if (fieldName.startsWith('documents.')) {
+        const docKey = fieldName.replace('documents.', '');
+        const currentBinaries = getValues('documentsBinary') || {};
+        setValue('documentsBinary' as any, { ...currentBinaries, [docKey]: base64 });
+      }
+    }
+  }, [setValue, getValues]);
+
+  /** Remove a file preview */
+  const removeFile = useCallback((fieldName: string) => {
+    setPreviews((prev) => {
+      const { [fieldName]: removed, ...rest } = prev;
+      // Revoke object URL to free memory
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
+      return rest;
+    });
+
+    // Clear the form value
+    if (fieldName === 'photo') {
+      setValue('photo' as any, undefined as any);
+      setValue('photoBinary' as any, undefined as any);
+    } else if (fieldName.startsWith('documents.')) {
+      setValue(fieldName as any, undefined as any);
+      const docKey = fieldName.replace('documents.', '');
+      const currentBinaries = getValues('documentsBinary') || {};
+      const { [docKey]: _, ...restBinaries } = currentBinaries;
+      setValue('documentsBinary' as any, restBinaries);
+    }
+  }, [setValue, getValues]);
+
+  /** Render a file upload field with preview */
+  const renderFileField = (label: string, fieldName: string, accept?: string, multiple = false) => {
+    const preview = previews[fieldName];
+    const error = fieldName === 'photo'
+      ? (errors as any).photo
+      : fieldName.startsWith('documents.')
+        ? (errors as any).documents?.[fieldName.replace('documents.', '')]
+        : undefined;
+
+    return (
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+        <div className="flex items-start gap-3">
+          <div className="flex-1">
+            <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 cursor-pointer hover:bg-slate-50 transition-colors">
+              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span className="text-sm text-slate-600">{preview ? preview.file.name : `Upload ${label}`}</span>
+              <input
+                hidden
+                type="file"
+                accept={accept}
+                multiple={multiple}
+                onChange={(e) => handleFileChange(fieldName, e.currentTarget.files)}
+              />
+            </label>
+            {error && <p className="mt-1 text-xs text-red-600">Required</p>}
+          </div>
+
+          {/* Preview thumbnails */}
+          {preview && preview.previewUrl && (
+            <div className="relative shrink-0">
+              <img
+                src={preview.previewUrl}
+                alt={preview.file.name}
+                className="h-16 w-16 rounded-lg border border-slate-200 object-cover shadow-sm"
+              />
+              <button
+                type="button"
+                onClick={() => removeFile(fieldName)}
+                className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs shadow hover:bg-red-600 transition-colors"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* Non-image file preview */}
+          {preview && !preview.previewUrl && (
+            <div className="relative shrink-0">
+              <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
+                <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeFile(fieldName)}
+                className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs shadow hover:bg-red-600 transition-colors"
+              >
+                ×
+              </button>
+            </div>
+          )}
+        </div>
+        {preview && (
+          <p className="mt-1 text-xs text-slate-500">{preview.file.name} ({(preview.file.size / 1024).toFixed(1)} KB)</p>
+        )}
+      </div>
+    );
+  };
 
   const stepFields = useMemo(
     () => [
-      ['firstName', 'lastName', 'gender', 'dob', 'mobile', 'email'],
+      mode === 'edit'
+        ? ['gender', 'dob', 'mobile', 'email']
+        : ['firstName', 'lastName', 'gender', 'dob', 'mobile', 'email'],
       ['parent.fatherName', 'parent.motherName', 'parent.guardianName', 'parent.guardianMobile', 'parent.guardianEmail'],
-      ['academic.admissionNo', 'academic.rollNo', 'academic.admissionDate', 'academic.classId', 'academic.sectionId', 'academic.session', 'academic.studentType'],
+      mode === 'edit'
+        ? ['academic.rollNo', 'academic.admissionDate', 'academic.classId', 'academic.sectionId', 'academic.session', 'academic.studentType']
+        : ['academic.admissionNo', 'academic.rollNo', 'academic.admissionDate', 'academic.classId', 'academic.sectionId', 'academic.session', 'academic.studentType'],
       ['address.addressLine', 'address.state', 'address.district', 'address.city', 'address.pinCode'],
       ['hostel.hostelName', 'hostel.roomNo', 'hostel.bedNo', 'hostel.wardenName', 'hostel.joiningDate'],
       ['documents.birthCertificate', 'documents.transferCertificate', 'documents.aadhaar', 'documents.previousMarksheet', 'documents.otherDocuments'],
     ],
-    []
+    [mode]
   );
 
   const onNext = async () => {
@@ -106,156 +326,377 @@ export function StudentForm({ defaultValues, onSubmit, mode }: { defaultValues?:
   };
 
   return (
-    <div className="card shadow-sm">
-      <div className="card-body">
-        <ul className="nav nav-pills flex-wrap mb-3">
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="space-y-6">
+        <div className="flex flex-wrap gap-2 border-b border-slate-200">
           {steps.map((label, index) => (
-            <li className="nav-item" key={label}>
-              <button type="button" className={`nav-link ${index === step ? 'active' : ''}`} onClick={() => setStep(index)}>
-                {label}
-              </button>
-            </li>
+            <button
+              key={label}
+              type="button"
+              onClick={() => setStep(index)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                index === step
+                  ? 'border-b-2 border-blue-600 text-blue-600'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {label}
+            </button>
           ))}
-        </ul>
+        </div>
 
-        {formError && <div className="alert alert-danger">{formError}</div>}
+        {formError && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {formError}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit(handleFormSubmit)} noValidate>
+        <form onSubmit={handleSubmit(handleFormSubmit)} noValidate className="space-y-6">
           {step === 0 && (
-            <div className="row g-3">
-              <div className="col-12 col-md-6">
-                <label className="form-label">First Name</label>
-                <input className={`form-control ${errors.firstName ? 'is-invalid' : ''}`} {...register('firstName', { required: true })} />
-                {errors.firstName && <div className="invalid-feedback">Required</div>}
-              </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Last Name</label>
-                <input className={`form-control ${errors.lastName ? 'is-invalid' : ''}`} {...register('lastName', { required: true })} />
-                {errors.lastName && <div className="invalid-feedback">Required</div>}
-              </div>
-              <div className="col-12 col-md-4">
-                <label className="form-label">Gender</label>
-                <select className="form-select" defaultValue="male" {...register('gender', { required: true })}>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {mode !== 'edit' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">First Name *</label>
+                    <input
+                      className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                        errors.firstName
+                          ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                          : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                      }`}
+                      {...register('firstName', { required: true })}
+                    />
+                    {errors.firstName && <p className="mt-1 text-xs text-red-600">Required</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Last Name *</label>
+                    <input
+                      className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                        errors.lastName
+                          ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                          : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                      }`}
+                      {...register('lastName', { required: true })}
+                    />
+                    {errors.lastName && <p className="mt-1 text-xs text-red-600">Required</p>}
+                  </div>
+                </>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Gender *</label>
+                <select
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                  defaultValue="male"
+                  {...register('gender', { required: true })}
+                >
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                   <option value="other">Other</option>
                 </select>
               </div>
-              <div className="col-12 col-md-4">
-                <label className="form-label">Date of Birth</label>
-                <input type="date" className={`form-control ${errors.dob ? 'is-invalid' : ''}`} {...register('dob', { required: true })} />
-                {errors.dob && <div className="invalid-feedback">Required</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Date of Birth *</label>
+                <input
+                  type="date"
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.dob
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('dob', { required: true })}
+                />
+                {errors.dob && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-4">
-                <label className="form-label">Blood Group</label>
-                <input className="form-control" {...register('bloodGroup')} />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Blood Group</label>
+                <select
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                  {...register('bloodGroup')}
+                >
+                  <option value="">Select Blood Group</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                </select>
               </div>
-              <div className="col-12 col-md-4">
-                <label className="form-label">Religion</label>
-                <input className="form-control" {...register('religion')} />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Religion</label>
+                <select
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                  {...register('religion')}
+                >
+                  <option value="">Select Religion</option>
+                  <option value="Hinduism">Hinduism</option>
+                  <option value="Islam">Islam</option>
+                  <option value="Christianity">Christianity</option>
+                  <option value="Sikhism">Sikhism</option>
+                  <option value="Buddhism">Buddhism</option>
+                  <option value="Jainism">Jainism</option>
+                  <option value="Zoroastrianism">Zoroastrianism</option>
+                  <option value="Judaism">Judaism</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
-              <div className="col-12 col-md-4">
-                <label className="form-label">Category</label>
-                <input className="form-control" {...register('category')} />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
+                <select
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                  {...register('category')}
+                >
+                  <option value="">Select Category</option>
+                  <option value="General">General (Unreserved)</option>
+                  <option value="SC">SC (Scheduled Caste)</option>
+                  <option value="ST">ST (Scheduled Tribe)</option>
+                  <option value="OBC">OBC (Other Backward Classes)</option>
+                  <option value="EWS">EWS (Economically Weaker Sections)</option>
+                </select>
               </div>
-              <div className="col-12 col-md-4">
-                <label className="form-label">Aadhaar Number (placeholder)</label>
-                <input className="form-control" {...register('aadhaarNo')} />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Aadhaar Number</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={12}
+                  onInput={(e) => {
+                    e.currentTarget.value = e.currentTarget.value.replace(/\D/g, '');
+                  }}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.aadhaarNo
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('aadhaarNo', {
+                    pattern: {
+                      value: /^\d{0,12}$/,
+                      message: 'Only digits allowed, max 12 digits'
+                    },
+                    validate: (v) => !v || (/^\d{12}$/.test(v) || 'Must be exactly 12 digits')
+                  })}
+                />
+                {errors.aadhaarNo && <p className="mt-1 text-xs text-red-600">{errors.aadhaarNo.message}</p>}
               </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Mobile Number</label>
-                <input className={`form-control ${errors.mobile ? 'is-invalid' : ''}`} {...register('mobile', { required: true, validate: (v) => isValidMobile(v) || 'Invalid mobile' })} />
-                {errors.mobile && <div className="invalid-feedback">Required</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Mobile Number *</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={10}
+                  onInput={(e) => {
+                    e.currentTarget.value = e.currentTarget.value.replace(/\D/g, '');
+                  }}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.mobile
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('mobile', { required: true, validate: (v) => isValidMobile(v) || 'Invalid mobile' })}
+                />
+                {errors.mobile && <p className="mt-1 text-xs text-red-600">Required / Invalid</p>}
               </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Email</label>
-                <input className={`form-control ${errors.email ? 'is-invalid' : ''}`} {...register('email', { validate: (v) => !v || isValidEmail(v) || 'Invalid email' })} />
-                {errors.email && <div className="invalid-feedback">Invalid email</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                <input
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.email
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('email', { validate: (v) => !v || isValidEmail(v) || 'Invalid email' })}
+                />
+                {errors.email && <p className="mt-1 text-xs text-red-600">Invalid email</p>}
               </div>
-              <div className="col-12">
-                <label className="btn btn-outline-secondary btn-sm">
-                  Student Photo Upload
-                  <input hidden type="file" accept="image/*" {...register('photo')} />
-                </label>
-              </div>
+              {renderFileField('Photo', 'photo', 'image/*')}
             </div>
           )}
 
           {step === 1 && (
-            <div className="row g-3">
-              <div className="col-12 col-md-6">
-                <label className="form-label">Father Name</label>
-                <input className={`form-control ${errors.parent?.fatherName ? 'is-invalid' : ''}`} {...register('parent.fatherName', { required: true })} />
-                {errors.parent?.fatherName && <div className="invalid-feedback">Required</div>}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Father Name *</label>
+                <input
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.parent?.fatherName
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('parent.fatherName', { required: true })}
+                />
+                {errors.parent?.fatherName && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Mother Name</label>
-                <input className={`form-control ${errors.parent?.motherName ? 'is-invalid' : ''}`} {...register('parent.motherName', { required: true })} />
-                {errors.parent?.motherName && <div className="invalid-feedback">Required</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Mother Name *</label>
+                <input
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.parent?.motherName
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('parent.motherName', { required: true })}
+                />
+                {errors.parent?.motherName && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Guardian Name</label>
-                <input className={`form-control ${errors.parent?.guardianName ? 'is-invalid' : ''}`} {...register('parent.guardianName', { required: true })} />
-                {errors.parent?.guardianName && <div className="invalid-feedback">Required</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Guardian Name *</label>
+                <input
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.parent?.guardianName
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('parent.guardianName', { required: true })}
+                />
+                {errors.parent?.guardianName && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Guardian Mobile</label>
-                <input className={`form-control ${errors.parent?.guardianMobile ? 'is-invalid' : ''}`} {...register('parent.guardianMobile', { required: true })} />
-                {errors.parent?.guardianMobile && <div className="invalid-feedback">Required</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Guardian Mobile *</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={10}
+                  onInput={(e) => {
+                    e.currentTarget.value = e.currentTarget.value.replace(/\D/g, '');
+                  }}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.parent?.guardianMobile
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('parent.guardianMobile', { required: true })}
+                />
+                {errors.parent?.guardianMobile && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Guardian Email</label>
-                <input className="form-control" {...register('parent.guardianEmail')} />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Guardian Email</label>
+                <input
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                  {...register('parent.guardianEmail')}
+                />
               </div>
-              <div className="col-12 col-md-3">
-                <label className="form-label">Occupation</label>
-                <input className="form-control" {...register('parent.occupation')} />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Occupation</label>
+                <input
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                  {...register('parent.occupation')}
+                />
               </div>
-              <div className="col-12 col-md-3">
-                <label className="form-label">Annual Income (placeholder)</label>
-                <input className="form-control" {...register('parent.annualIncome')} />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Annual Income</label>
+                <input
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                  {...register('parent.annualIncome')}
+                />
               </div>
             </div>
           )}
 
           {step === 2 && (
-            <div className="row g-3">
-              <div className="col-12 col-md-6">
-                <label className="form-label">Admission Number</label>
-                <input className="form-control" disabled={mode === 'edit'} {...register('academic.admissionNo', { required: true })} />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {mode !== 'edit' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Admission Number *</label>
+                  <input
+                    disabled
+                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 disabled:opacity-50"
+                    {...register('academic.admissionNo', { required: true })}
+                  />
+                  {admissionNoLoading && <p className="mt-1 text-xs text-blue-600">Generating admission number...</p>}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Roll Number *</label>
+                <input
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.academic?.rollNo
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('academic.rollNo', { required: true })}
+                />
+                {errors.academic?.rollNo && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Roll Number</label>
-                <input className={`form-control ${errors.academic?.rollNo ? 'is-invalid' : ''}`} {...register('academic.rollNo', { required: true })} />
-                {errors.academic?.rollNo && <div className="invalid-feedback">Required</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Admission Date *</label>
+                <input
+                  type="date"
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.academic?.admissionDate
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('academic.admissionDate', { required: true })}
+                />
+                {errors.academic?.admissionDate && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-4">
-                <label className="form-label">Admission Date</label>
-                <input type="date" className={`form-control ${errors.academic?.admissionDate ? 'is-invalid' : ''}`} {...register('academic.admissionDate', { required: true })} />
-                {errors.academic?.admissionDate && <div className="invalid-feedback">Required</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Class *</label>
+                <select
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.academic?.classId
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('academic.classId', { required: true })}
+                >
+                  <option value="">Select Class</option>
+                  {classOptions.map((cls) => (
+                    <option key={cls.id} value={cls.className}>{cls.className}</option>
+                  ))}
+                </select>
+                {errors.academic?.classId && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-4">
-                <label className="form-label">Class</label>
-                <input className={`form-control ${errors.academic?.classId ? 'is-invalid' : ''}`} {...register('academic.classId', { required: true })} />
-                {errors.academic?.classId && <div className="invalid-feedback">Required</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Section *</label>
+                <select
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.academic?.sectionId
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('academic.sectionId', { required: true })}
+                >
+                  <option value="">Select Section</option>
+                  {sectionOptions.map((sec) => (
+                    <option key={sec.id} value={sec.sectionCode}>Section {sec.sectionName}</option>
+                  ))}
+                </select>
+                {errors.academic?.sectionId && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-4">
-                <label className="form-label">Section</label>
-                <input className={`form-control ${errors.academic?.sectionId ? 'is-invalid' : ''}`} {...register('academic.sectionId', { required: true })} />
-                {errors.academic?.sectionId && <div className="invalid-feedback">Required</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Session *</label>
+                <select
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.academic?.session
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('academic.session', { required: true })}
+                >
+                  <option value="">Select Session</option>
+                  {sessionOptions.map((s) => (
+                    <option key={s.id} value={s.sessionName}>{s.sessionName}</option>
+                  ))}
+                </select>
+                {errors.academic?.session && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Session</label>
-                <input className={`form-control ${errors.academic?.session ? 'is-invalid' : ''}`} {...register('academic.session', { required: true })} />
-                {errors.academic?.session && <div className="invalid-feedback">Required</div>}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Previous School</label>
+                <input
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                  {...register('academic.previousSchool')}
+                />
               </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Previous School</label>
-                <input className="form-control" {...register('academic.previousSchool')} />
-              </div>
-              <div className="col-12 col-md-6">
-                <label className="form-label">Student Type</label>
-                <select className="form-select" defaultValue={studentType} {...register('academic.studentType', { required: true })}>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Student Type *</label>
+                <select
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                  defaultValue={studentType}
+                  {...register('academic.studentType', { required: true })}
+                >
                   <option value="day_scholar">Day Scholar</option>
                   <option value="residential">Residential</option>
                 </select>
@@ -264,103 +705,208 @@ export function StudentForm({ defaultValues, onSubmit, mode }: { defaultValues?:
           )}
 
           {step === 3 && (
-            <div className="row g-3">
-              <div className="col-12">
-                <label className="form-label">Address Line</label>
-                <input className={`form-control ${errors.address?.addressLine ? 'is-invalid' : ''}`} {...register('address.addressLine', { required: true })} />
-                {errors.address?.addressLine && <div className="invalid-feedback">Required</div>}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Address Line *</label>
+                <textarea
+                  rows={3}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    errors.address?.addressLine
+                      ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }`}
+                  {...register('address.addressLine', { required: true })}
+                />
+                {errors.address?.addressLine && <p className="mt-1 text-xs text-red-600">Required</p>}
               </div>
-              <div className="col-12 col-md-3">
-                <label className="form-label">State</label>
-                <input className={`form-control ${errors.address?.state ? 'is-invalid' : ''}`} {...register('address.state', { required: true })} />
-                {errors.address?.state && <div className="invalid-feedback">Required</div>}
-              </div>
-              <div className="col-12 col-md-3">
-                <label className="form-label">District</label>
-                <input className={`form-control ${errors.address?.district ? 'is-invalid' : ''}`} {...register('address.district', { required: true })} />
-                {errors.address?.district && <div className="invalid-feedback">Required</div>}
-              </div>
-              <div className="col-12 col-md-3">
-                <label className="form-label">City</label>
-                <input className={`form-control ${errors.address?.city ? 'is-invalid' : ''}`} {...register('address.city', { required: true })} />
-                {errors.address?.city && <div className="invalid-feedback">Required</div>}
-              </div>
-              <div className="col-12 col-md-3">
-                <label className="form-label">Pin Code</label>
-                <input className={`form-control ${errors.address?.pinCode ? 'is-invalid' : ''}`} {...register('address.pinCode', { required: true })} />
-                {errors.address?.pinCode && <div className="invalid-feedback">Required</div>}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">State *</label>
+                  <select
+                    className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      errors.address?.state
+                        ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                        : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                    }`}
+                    {...register('address.state', { required: true })}
+                    onChange={handleStateChange}
+                  >
+                    <option value="">Select State</option>
+                    {statesList.map((state) => (
+                      <option key={state} value={state}>{state}</option>
+                    ))}
+                  </select>
+                  {errors.address?.state && <p className="mt-1 text-xs text-red-600">Required</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">District *</label>
+                  <select
+                    className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      !selectedState ? 'bg-slate-100' : ''
+                    } ${
+                      errors.address?.district
+                        ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                        : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                    }`}
+                    disabled={!selectedState}
+                    {...register('address.district', { required: true })}
+                    onChange={handleDistrictChange}
+                  >
+                    <option value="">Select District</option>
+                    {districtsForState.map((district) => (
+                      <option key={district} value={district}>{district}</option>
+                    ))}
+                  </select>
+                  {errors.address?.district && <p className="mt-1 text-xs text-red-600">Required</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">City/Town *</label>
+                  <select
+                    className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      !selectedDistrict ? 'bg-slate-100' : ''
+                    } ${
+                      errors.address?.city
+                        ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                        : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                    }`}
+                    disabled={!selectedDistrict}
+                    {...register('address.city', { required: true })}
+                  >
+                    <option value="">Select City</option>
+                    {citiesForDistrict.map((city) => (
+                      <option key={city} value={city}>{city}</option>
+                    ))}
+                  </select>
+                  {errors.address?.city && <p className="mt-1 text-xs text-red-600">Required</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Pin Code *</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    onInput={(e) => {
+                      e.currentTarget.value = e.currentTarget.value.replace(/\D/g, '');
+                    }}
+                    className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      errors.address?.pinCode
+                        ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                        : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                    }`}
+                    {...register('address.pinCode', { required: true })}
+                  />
+                  {errors.address?.pinCode && <p className="mt-1 text-xs text-red-600">Required</p>}
+                </div>
               </div>
             </div>
           )}
 
           {step === 4 && (
             studentType === 'residential' ? (
-              <div className="row g-3">
-                <div className="col-12 col-md-6">
-                  <label className="form-label">Hostel Name</label>
-                  <input className={`form-control ${errors.hostel?.hostelName ? 'is-invalid' : ''}`} {...register('hostel.hostelName', { required: true })} />
-                  {errors.hostel?.hostelName && <div className="invalid-feedback">Required</div>}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Hostel Name *</label>
+                  <input
+                    className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      errors.hostel?.hostelName
+                        ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                        : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                    }`}
+                    {...register('hostel.hostelName', { required: true })}
+                  />
+                  {errors.hostel?.hostelName && <p className="mt-1 text-xs text-red-600">Required</p>}
                 </div>
-                <div className="col-12 col-md-3">
-                  <label className="form-label">Room Number</label>
-                  <input className={`form-control ${errors.hostel?.roomNo ? 'is-invalid' : ''}`} {...register('hostel.roomNo', { required: true })} />
-                  {errors.hostel?.roomNo && <div className="invalid-feedback">Required</div>}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Room Number *</label>
+                  <input
+                    className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      errors.hostel?.roomNo
+                        ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                        : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                    }`}
+                    {...register('hostel.roomNo', { required: true })}
+                  />
+                  {errors.hostel?.roomNo && <p className="mt-1 text-xs text-red-600">Required</p>}
                 </div>
-                <div className="col-12 col-md-3">
-                  <label className="form-label">Bed Number</label>
-                  <input className={`form-control ${errors.hostel?.bedNo ? 'is-invalid' : ''}`} {...register('hostel.bedNo', { required: true })} />
-                  {errors.hostel?.bedNo && <div className="invalid-feedback">Required</div>}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Bed Number *</label>
+                  <input
+                    className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      errors.hostel?.bedNo
+                        ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                        : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                    }`}
+                    {...register('hostel.bedNo', { required: true })}
+                  />
+                  {errors.hostel?.bedNo && <p className="mt-1 text-xs text-red-600">Required</p>}
                 </div>
-                <div className="col-12 col-md-6">
-                  <label className="form-label">Warden Name</label>
-                  <input className={`form-control ${errors.hostel?.wardenName ? 'is-invalid' : ''}`} {...register('hostel.wardenName', { required: true })} />
-                  {errors.hostel?.wardenName && <div className="invalid-feedback">Required</div>}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Warden Name *</label>
+                  <input
+                    className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      errors.hostel?.wardenName
+                        ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                        : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                    }`}
+                    {...register('hostel.wardenName', { required: true })}
+                  />
+                  {errors.hostel?.wardenName && <p className="mt-1 text-xs text-red-600">Required</p>}
                 </div>
-                <div className="col-12 col-md-6">
-                  <label className="form-label">Joining Date</label>
-                  <input type="date" className={`form-control ${errors.hostel?.joiningDate ? 'is-invalid' : ''}`} {...register('hostel.joiningDate', { required: true })} />
-                  {errors.hostel?.joiningDate && <div className="invalid-feedback">Required</div>}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Joining Date *</label>
+                  <input
+                    type="date"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      errors.hostel?.joiningDate
+                        ? 'border-red-300 bg-red-50 text-slate-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                        : 'border-slate-300 bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                    }`}
+                    {...register('hostel.joiningDate', { required: true })}
+                  />
+                  {errors.hostel?.joiningDate && <p className="mt-1 text-xs text-red-600">Required</p>}
                 </div>
               </div>
             ) : (
-              <div className="alert alert-info">Hostel section is only required for Residential students.</div>
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                Hostel section is only required for Residential students.
+              </div>
             )
           )}
 
           {step === 5 && (
-            <div className="d-grid gap-2">
-              <div>
-                <label className="form-label">Birth Certificate</label>
-                <input type="file" className="form-control" {...register('documents.birthCertificate')} />
+            <div className="space-y-4">
+              {renderFileField('Birth Certificate', 'documents.birthCertificate', 'image/*,.pdf')}
+              {renderFileField('Transfer Certificate', 'documents.transferCertificate', 'image/*,.pdf')}
+              {renderFileField('Aadhaar Card', 'documents.aadhaar', 'image/*,.pdf')}
+              {renderFileField('Previous Marksheet', 'documents.previousMarksheet', 'image/*,.pdf')}
+              {renderFileField('Other Documents', 'documents.otherDocuments', undefined, true)}
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                Files will be stored as base64 binary data in Firestore. Image files show a thumbnail preview.
               </div>
-              <div>
-                <label className="form-label">Transfer Certificate</label>
-                <input type="file" className="form-control" {...register('documents.transferCertificate')} />
-              </div>
-              <div>
-                <label className="form-label">Aadhaar (placeholder)</label>
-                <input type="file" className="form-control" {...register('documents.aadhaar')} />
-              </div>
-              <div>
-                <label className="form-label">Previous Marksheet</label>
-                <input type="file" className="form-control" {...register('documents.previousMarksheet')} />
-              </div>
-              <div>
-                <label className="form-label">Other Documents</label>
-                <input type="file" className="form-control" multiple {...register('documents.otherDocuments')} />
-              </div>
-              <div className="alert alert-info">Files should be uploaded to Firebase Storage and document URLs saved in Firestore during submission integration.</div>
             </div>
           )}
 
-          <div className="d-flex flex-wrap gap-2 mt-4">
-            <button type="button" className="btn btn-outline-secondary btn-sm" disabled={step === 0} onClick={() => setStep((s) => s - 1)}>
+          <div className="flex flex-wrap items-center gap-3 pt-6 border-t border-slate-200">
+            <button
+              type="button"
+              disabled={step === 0}
+              onClick={() => setStep((s) => s - 1)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
               Back
             </button>
-            <button type="button" className="btn btn-outline-secondary btn-sm" disabled={step === steps.length - 1} onClick={onNext}>
+            <button
+              type="button"
+              disabled={step === steps.length - 1}
+              onClick={onNext}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
               Next
             </button>
-            <button type="submit" className="btn btn-primary btn-sm">
+            <button
+              type="submit"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
+            >
               {mode === 'create' ? 'Create Student' : 'Save Changes'}
             </button>
           </div>

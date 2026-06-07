@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import NexSchoolLogo from './NexSchoolLogo';
 
 const sidebarWidth = 280;
 
@@ -36,7 +37,9 @@ export function AppLayout() {
   const navList = (
     <>
       <div className="mb-6 flex items-center justify-between w-full">
-        <div className="text-lg font-bold text-gray-900">NexSchool</div>
+        <div className="text-lg font-bold text-gray-900 flex items-center gap-3">
+          <NexSchoolLogo />
+        </div>
         <button
           type="button"
           className="lg:hidden inline-flex items-center justify-center w-8 h-8 rounded-md text-gray-600 hover:bg-gray-200 transition-colors"
@@ -65,26 +68,24 @@ export function AppLayout() {
           );
         })}
       </nav>
-      <button
-        type="button"
-        className="mt-6 w-full rounded-lg bg-red-600 text-white py-3 text-sm font-semibold hover:bg-red-700 transition-colors"
-        onClick={handleLogout}
-      >
-        Logout
-      </button>
     </>
   );
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <nav className="hidden lg:flex flex-col flex-shrink-0 bg-white border-r border-gray-200 p-6 shadow-sm" style={{ width: sidebarWidth }}>
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Desktop Sidebar — fixed, scrollable independently */}
+      <nav
+        className="hidden lg:flex flex-col flex-shrink-0 bg-white border-r border-gray-200 p-6 shadow-sm overflow-y-auto"
+        style={{ width: sidebarWidth }}
+      >
         {navList}
       </nav>
 
+      {/* Mobile Sidebar Overlay */}
       {mobileNavOpen && (
         <>
           <div
-            className="fixed top-0 left-0 h-screen bg-white border-r border-gray-200 p-6 shadow-xl lg:hidden flex-shrink-0 z-50"
+            className="fixed top-0 left-0 h-screen bg-white border-r border-gray-200 p-6 shadow-xl lg:hidden flex-shrink-0 z-50 overflow-y-auto"
             style={{ width: sidebarWidth }}
           >
             {navList}
@@ -96,8 +97,10 @@ export function AppLayout() {
         </>
       )}
 
-      <div className="flex-grow">
-        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200 bg-white gap-3">
+      {/* Right side: top bar + scrollable content */}
+      <div className="flex flex-col flex-grow min-w-0">
+        {/* Top bar — sticky within its column */}
+        <div className="flex-shrink-0 px-6 py-4 flex items-center justify-between border-b border-gray-200 bg-white gap-3">
           <h1 className="text-2xl font-bold text-gray-900">NexSchool SMS</h1>
           <div className="flex items-center gap-3">
             <button
@@ -118,7 +121,8 @@ export function AppLayout() {
           </div>
         </div>
 
-        <main className="p-8">
+        {/* Scrollable main content */}
+        <main className="flex-grow p-8 overflow-y-auto">
           <Outlet />
         </main>
       </div>

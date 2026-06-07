@@ -1,5 +1,13 @@
 import { Student } from '../types';
 
+function titleCase(value: string) {
+  return value
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`)
+    .join(' ');
+}
+
 export function StudentTable({
   rows,
   total,
@@ -8,7 +16,9 @@ export function StudentTable({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onDelete,
+  onView,
+  onEdit,
+  onPrint,
 }: {
   rows: Student[];
   total: number;
@@ -17,7 +27,9 @@ export function StudentTable({
   pageSize: number;
   onPageChange: (v: number) => void;
   onPageSizeChange: (v: number) => void;
-  onDelete: (id: string) => void;
+  onView: (id: string) => void;
+  onEdit: (id: string) => void;
+  onPrint: (student: Student) => void;
 }) {
   if (loading) {
     return (
@@ -74,35 +86,31 @@ export function StudentTable({
                   </div>
                 </td>
                 <td className="px-4 py-3 align-top text-slate-700">{r.academic.admissionNo}</td>
-                <td className="px-4 py-3 align-top text-slate-700">{r.academic.rollNo}</td>
-                <td className="px-4 py-3 align-top text-slate-700">{r.fullName}</td>
-                <td className="px-4 py-3 align-top text-slate-700">{r.academic.classId}</td>
-                <td className="px-4 py-3 align-top text-slate-700">{r.academic.sectionId}</td>
-                <td className="px-4 py-3 align-top text-slate-700">{r.gender}</td>
+                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.academic.rollNo)}</td>
+                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.fullName)}</td>
+                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.academic.classId)}</td>
+                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.academic.sectionId)}</td>
+                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.gender)}</td>
                 <td className="px-4 py-3 align-top text-slate-700">{r.mobile}</td>
-                <td className="px-4 py-3 align-top text-slate-700">{r.academic.studentType}</td>
+                <td className="px-4 py-3 align-top text-slate-700">
+                  {r.academic.studentType === 'residential' ? 'Residential' : 'Day Scholar'}
+                </td>
                 <td className="px-4 py-3 align-top">
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
                     r.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
                   }`}>
-                    {r.status}
+                    {titleCase(r.status)}
                   </span>
                 </td>
                 <td className="px-4 py-3 align-top">
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" className="rounded-2xl border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                    <button type="button" onClick={() => onView(r.id)} className="rounded-2xl border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
                       View
                     </button>
-                    <button type="button" className="rounded-2xl border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                    <button type="button" onClick={() => onEdit(r.id)} className="rounded-2xl border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
                       Edit
                     </button>
-                    <button type="button" className="rounded-2xl border border-red-300 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100" onClick={() => onDelete(r.id)}>
-                      Delete
-                    </button>
-                    <button type="button" className="rounded-2xl border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
-                      Promote
-                    </button>
-                    <button type="button" className="rounded-2xl border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                    <button type="button" onClick={() => onPrint(r)} className="rounded-2xl border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">
                       Print ID
                     </button>
                   </div>

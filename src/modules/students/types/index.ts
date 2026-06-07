@@ -16,6 +16,13 @@ export interface AddressInfo { addressLine: string; state: string; district: str
 export interface AcademicInfo {
   admissionNo: string; rollNo: string; admissionDate: string; classId: string; sectionId: string; session: string; previousSchool?: string; studentType: StudentType;
 }
+export const CLASS_OPTIONS = [
+  'Playgroup', 'Nursery', 'LKG', 'UKG',
+  'Standard 1', 'Standard 2', 'Standard 3', 'Standard 4', 'Standard 5',
+  'Standard 6', 'Standard 7', 'Standard 8', 'Standard 9', 'Standard 10',
+] as const;
+export const SECTION_OPTIONS = ['A', 'B', 'C', 'D'] as const;
+export const SESSION_OPTIONS = ['2026-2027', '2027-2028', '2028-2029', '2029-2030', '2030-2031'] as const;
 export interface HostelInfo { hostelName: string; roomNo: string; bedNo: string; wardenName: string; joiningDate: string; }
 export interface Student {
   id: string; firstName: string; lastName: string; fullName: string; gender: 'male'|'female'|'other'; dob: string; bloodGroup?: string;

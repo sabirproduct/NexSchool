@@ -1,13 +1,15 @@
 import { Link } from 'react-router-dom';
 import { Student } from '../types';
 
-export function StudentProfileHeader({ student }: { student: Student }) {
+export function StudentProfileHeader({ student, photoBinary }: { student: Student; photoBinary?: string }) {
   return (
     <div className="card shadow-sm mb-3">
       <div className="card-body">
         <div className="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
           <div className="d-flex align-items-center gap-3">
-            {student.photoUrl ? (
+            {photoBinary ? (
+              <img src={photoBinary} alt={student.fullName} className="rounded-circle border" style={{ width: 72, height: 72, objectFit: 'cover' }} />
+            ) : student.photoUrl ? (
               <img src={student.photoUrl} alt={student.fullName} className="rounded-circle border" style={{ width: 72, height: 72, objectFit: 'cover' }} />
             ) : (
               <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style={{ width: 72, height: 72, fontSize: '1.25rem' }}>

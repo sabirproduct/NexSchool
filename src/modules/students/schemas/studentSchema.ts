@@ -9,5 +9,11 @@ export function validateStudentPayload(input: Partial<Student>) {
   if (input.email && !isValidEmail(input.email)) errors.email = 'Invalid email';
   if (!input.academic?.admissionNo) errors.admissionNo = 'Admission number is required';
   if (!input.academic?.classId) errors.classId = 'Class is required';
+  if (!input.academic?.sectionId) errors.sectionId = 'Section is required';
+  if (!input.academic?.session) errors.session = 'Session is required';
+  if (!input.address?.state) errors.state = 'State is required';
+  if (!input.address?.district) errors.district = 'District is required';
+  if (!input.address?.city) errors.city = 'City is required';
+  if (!input.address?.pinCode) errors.pinCode = 'Pin Code is required';
   return { valid: Object.keys(errors).length === 0, errors };
 }

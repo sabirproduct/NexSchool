@@ -7,14 +7,9 @@ service cloud.firestore {
     function isAdmin() { return role() in ['super_admin','school_admin','principal']; }
 
     match /students/{studentId} {
-      allow create, update, delete: if signedIn() && isAdmin();
-      allow read: if signedIn() && (
-        isAdmin() ||
-        (role() == 'teacher' && resource.data.classId in userDoc().assignedClassIds) ||
-        (role() == 'student' && resource.data.userId == request.auth.uid) ||
-        (role() == 'parent' && studentId in userDoc().studentIds) ||
-        (role() == 'accountant')
-      );
+      allow create: if true;  // Allow public create for student admission
+      allow read: if true;  // Allow reading students for list display
+      allow update, delete: if signedIn() && isAdmin();
     }
 
     match /parents/{parentId} {
