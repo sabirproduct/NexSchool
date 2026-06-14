@@ -1,0 +1,1 @@
+export { HostelModuleView } from '../components/HostelModuleView';

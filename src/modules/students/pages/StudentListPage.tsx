@@ -10,8 +10,9 @@ import { StudentCard } from '../components/StudentCard';
 
 export function StudentListPage() {
   const navigate = useNavigate();
-  const { rows, total, loading, page, pageSize, filters, setFilters, setPage, setPageSize, fetch } = useStudentsStore();
+  const { rows, total, loading, error, page, pageSize, filters, setFilters, setPage, setPageSize, fetch, clearError } = useStudentsStore();
   const [search, setSearch] = useState(filters.search ?? '');
+  const [showFilters, setShowFilters] = useState(false);
   const debounced = useDebouncedValue(search, 500);
 
   const openView = (id: string) => navigate(`/students/${id}`);
@@ -61,61 +62,108 @@ export function StudentListPage() {
       </div>
 
       <div className="grid gap-6">
+        {/* Search bar always visible */}
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <StudentSearchBar value={search} onChange={setSearch} />
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <StudentFilters value={filters} onChange={setFilters} />
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Sort By</label>
-                <select
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                  value={filters.sortBy ?? 'name'}
-                  onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as any })}
-                >
-                  <option value="name">Name</option>
-                  <option value="admissionDate">Admission Date</option>
-                  <option value="rollNo">Roll Number</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Order</label>
-                <select
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                  value={filters.sortOrder ?? 'asc'}
-                  onChange={(e) => setFilters({ ...filters, sortOrder: e.target.value as any })}
-                >
-                  <option value="asc">Ascending</option>
-                  <option value="desc">Descending</option>
-                </select>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <StudentSearchBar value={search} onChange={setSearch} />
             </div>
-          </div>
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-sm font-medium text-slate-700">Page Settings</div>
-            <div className="mt-3 flex items-center gap-3">
-              <span className="text-slate-500">Rows per page:</span>
-              <select
-                className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-              >
-                {[5, 10, 25, 50].map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`rounded-2xl border p-3 transition-colors ${
+                showFilters
+                  ? 'bg-blue-600 border-blue-600 text-white'
+                  : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+              title="Toggle filters"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+              </svg>
+            </button>
           </div>
         </div>
+
+        {/* Collapsible filters section */}
+        {showFilters && (
+          <>
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <StudentFilters value={filters} onChange={setFilters} />
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Sort By</label>
+                    <select
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      value={filters.sortBy ?? 'name'}
+                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as any })}
+                    >
+                      <option value="name">Name</option>
+                      <option value="admissionDate">Admission Date</option>
+                      <option value="rollNo">Roll Number</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Order</label>
+                    <select
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      value={filters.sortOrder ?? 'asc'}
+                      onChange={(e) => setFilters({ ...filters, sortOrder: e.target.value as any })}
+                    >
+                      <option value="asc">Ascending</option>
+                      <option value="desc">Descending</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="text-sm font-medium text-slate-700">Page Settings</div>
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="text-slate-500">Rows per page:</span>
+                  <select
+                    className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                  >
+                    {[5, 10, 25, 50].map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
+
+      {error && (
+        <div className="rounded-3xl border border-red-200 bg-red-50 p-6 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-red-800">Error loading students</h3>
+              <p className="mt-1 text-sm text-red-700">{error}</p>
+              <button
+                type="button"
+                onClick={() => { clearError(); fetch(); }}
+                className="mt-3 rounded-lg bg-red-100 px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-200 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
         <StudentTable

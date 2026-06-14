@@ -1,6 +1,6 @@
-import { FirebaseOptions, initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAnalytics } from 'firebase/analytics';
+import { FirebaseApp, FirebaseOptions, initializeApp } from 'firebase/app';
+import { Firestore, getFirestore } from 'firebase/firestore';
+import { Analytics, getAnalytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,8 +13,34 @@ const firebaseConfig: FirebaseOptions = {
 };
 
 const hasConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId);
-const app = hasConfig ? initializeApp(firebaseConfig) : null;
-const analytics = app ? getAnalytics(app) : null;
 
-export const db = app ? getFirestore(app) : null;
-export { analytics };
+let app: FirebaseApp | null = null;
+let analytics: Analytics | null = null;
+let db: Firestore | null = null;
+
+if (hasConfig) {
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    // Analytics may not be supported in all environments (e.g., local dev, extensions)
+    isSupported().then((supported) => {
+      if (supported) {
+        analytics = getAnalytics(app!);
+      } else {
+        console.log('Firebase Analytics not supported in this environment');
+      }
+    }).catch((err) => {
+      console.warn('Firebase Analytics support check failed:', err);
+    });
+    console.log('✅ Firebase initialized successfully');
+  } catch (error) {
+    console.error('❌ Firebase initialization error:', error);
+    app = null;
+    db = null;
+    analytics = null;
+  }
+} else {
+  console.warn('⚠️ Firebase configuration incomplete. Running in mock mode.');
+}
+
+export { db, analytics };

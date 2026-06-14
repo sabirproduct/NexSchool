@@ -11,28 +11,39 @@ const statusOptions: Array<AdmissionStatus | ''> = ['', 'Draft', 'Submitted', 'U
 
 export function AdmissionFilters({ search, onSearch, onStatus, onType }: Props) {
   return (
-    <div className="row g-3">
-      <div className="col-12 col-md-4">
-        <label className="form-label">Search</label>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">Search</label>
         <input
-          className="form-control form-control-sm"
           type="search"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
+          placeholder="Name or mobile..."
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
         />
       </div>
-      <div className="col-12 col-md-4">
-        <label className="form-label">Status</label>
-        <select className="form-select form-select-sm" defaultValue="" onChange={(e) => onStatus(e.target.value as AdmissionStatus | '')}>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">Status</label>
+        <select
+          defaultValue=""
+          onChange={(e) => onStatus(e.target.value as AdmissionStatus | '')}
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+        >
           {statusOptions.map((status) => (
-            <option key={status || 'all'} value={status}> {status || 'All'} </option>
+            <option key={status || 'all'} value={status}>
+              {status || 'All Statuses'}
+            </option>
           ))}
         </select>
       </div>
-      <div className="col-12 col-md-4">
-        <label className="form-label">Student Type</label>
-        <select className="form-select form-select-sm" defaultValue="" onChange={(e) => onType(e.target.value as StudentType | '')}>
-          <option value="">All</option>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">Student Type</label>
+        <select
+          defaultValue=""
+          onChange={(e) => onType(e.target.value as StudentType | '')}
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+        >
+          <option value="">All Types</option>
           <option value="Day Scholar">Day Scholar</option>
           <option value="Residential">Residential</option>
         </select>

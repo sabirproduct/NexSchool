@@ -47,13 +47,14 @@ export async function generateAdmissionNo(): Promise<string> {
 
 export async function listStudents(filters: StudentFilters, page: number, pageSize: number, schoolId?: string) {
   if (!db) return { rows: [], total: 0 };
+
+  // Try fetching with simple query first (no orderBy to avoid index requirement)
+  // Then sort/filter client-side
   try {
     const whereConstraints: any[] = [];
     if (schoolId) whereConstraints.push(where('schoolId', '==', schoolId));
-    if (filters.search) {
-      whereConstraints.push(where('fullName', '>=', filters.search));
-      whereConstraints.push(where('fullName', '<=', filters.search + '\uf8ff'));
-    }
+
+    // Only add filter constraints if they exist (keep it simple for index compliance)
     if (filters.classId) whereConstraints.push(where('academic.classId', '==', filters.classId));
     if (filters.sectionId) whereConstraints.push(where('academic.sectionId', '==', filters.sectionId));
     if (filters.gender) whereConstraints.push(where('gender', '==', filters.gender));
@@ -61,13 +62,57 @@ export async function listStudents(filters: StudentFilters, page: number, pageSi
     if (filters.studentType) whereConstraints.push(where('academic.studentType', '==', filters.studentType));
 
     const sortByField = filters.sortBy === 'rollNo' ? 'academic.rollNo' : filters.sortBy === 'admissionDate' ? 'academic.admissionDate' : 'fullName';
-    const sortOrder = filters.sortOrder === 'desc' ? 'desc' : 'asc';
+    const sortOrder = filters.sortOrder === 'desc' ? -1 : 1;
 
-    const q = filters.search
-      ? query(collection(db, 'students'), ...whereConstraints, orderBy('fullName', sortOrder), limit((page + 1) * pageSize))
-      : query(collection(db, 'students'), ...whereConstraints, orderBy(sortByField, sortOrder), limit((page + 1) * pageSize));
-    const snapshot = await getDocs(q);
-    const rows = snapshot.docs.map((d) => {
+    const fetchLimit = Math.min(500, (page + 1) * pageSize + 50);
+
+    // Try first with ordering (requires composite indexes)
+    let snapshot;
+    try {
+      let q;
+      if (filters.search) {
+        q = query(
+          collection(db, 'students'),
+          ...whereConstraints,
+          orderBy('fullName', sortOrder === 1 ? 'asc' : 'desc'),
+          limit(fetchLimit)
+        );
+      } else {
+        q = query(
+          collection(db, 'students'),
+          ...whereConstraints,
+          orderBy(sortByField, sortOrder === 1 ? 'asc' : 'desc'),
+          limit(fetchLimit)
+        );
+      }
+      snapshot = await getDocs(q);
+    } catch (indexError: any) {
+      // If index is still building, fall back to simple query + client-side sorting
+      if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('index')) {
+        console.warn('Composite index not ready yet, using fallback query. Indexes are being built...');
+
+        // Simple query with just schoolId filter
+        const simpleConstraints: any[] = [];
+        if (schoolId) simpleConstraints.push(where('schoolId', '==', schoolId));
+
+        // Apply remaining filters in the query where possible
+        if (filters.classId) simpleConstraints.push(where('academic.classId', '==', filters.classId));
+        if (filters.gender) simpleConstraints.push(where('gender', '==', filters.gender));
+        if (filters.status) simpleConstraints.push(where('status', '==', filters.status));
+
+        const fallbackQ = query(
+          collection(db, 'students'),
+          ...simpleConstraints,
+          orderBy('__name__'),
+          limit(fetchLimit)
+        );
+        snapshot = await getDocs(fallbackQ);
+      } else {
+        throw indexError;
+      }
+    }
+
+    let allRows = snapshot.docs.map((d) => {
       const data = d.data() as any;
       return {
         id: d.id,
@@ -75,10 +120,56 @@ export async function listStudents(filters: StudentFilters, page: number, pageSi
         photoUrl: data.photoUrl || data.photoBinary || undefined,
       } as Student;
     });
-    return { rows: rows.slice(page * pageSize), total: rows.length };
-  } catch (error) {
+
+    // Apply search filter client-side if needed
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      allRows = allRows.filter((s) => s.fullName.toLowerCase().includes(searchLower));
+    }
+
+    // Apply section filter client-side if it couldn't be applied in the query
+    if (filters.sectionId && !whereConstraints.some((c: any) => c?.key === 'academic.sectionId')) {
+      allRows = allRows.filter((s) => s.academic?.sectionId === filters.sectionId);
+    }
+
+    // Apply studentType filter client-side if needed
+    if (filters.studentType && !whereConstraints.some((c: any) => c?.key === 'academic.studentType')) {
+      allRows = allRows.filter((s) => s.academic?.studentType === filters.studentType);
+    }
+
+    // Client-side sort
+    allRows.sort((a, b) => {
+      let aVal: string = '';
+      let bVal: string = '';
+      if (filters.sortBy === 'rollNo') {
+        aVal = a.academic?.rollNo ?? '';
+        bVal = b.academic?.rollNo ?? '';
+      } else if (filters.sortBy === 'admissionDate') {
+        aVal = a.academic?.admissionDate ?? '';
+        bVal = b.academic?.admissionDate ?? '';
+      } else {
+        aVal = a.fullName ?? '';
+        bVal = b.fullName ?? '';
+      }
+      return aVal.localeCompare(bVal) * sortOrder;
+    });
+
+    // Paginate from the fetched results
+    const start = page * pageSize;
+    const rows = allRows.slice(start, start + pageSize);
+    const total = allRows.length;
+
+    return { rows, total };
+  } catch (error: any) {
     console.error('Error listing students:', error);
-    return { rows: [], total: 0 };
+    if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
+      throw new Error(
+        'Firestore composite indexes are currently being built. ' +
+        'This usually takes 1-5 minutes. Please wait and refresh.\n\n' +
+        'If the issue persists, deploy indexes with: firebase deploy --only firestore:indexes'
+      );
+    }
+    throw error;
   }
 }
 

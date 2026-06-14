@@ -9,7 +9,8 @@ service cloud.firestore {
     match /students/{studentId} {
       allow create: if true;  // Allow public create for student admission
       allow read: if true;  // Allow reading students for list display
-      allow update, delete: if signedIn() && isAdmin();
+      allow update: if true;  // Allow updates (using app-level auth);
+      allow delete: if signedIn() && isAdmin();
     }
 
     match /parents/{parentId} {

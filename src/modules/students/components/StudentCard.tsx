@@ -25,7 +25,7 @@ export function StudentCard({ student }: { student: Student }) {
         <div className="flex-1 min-w-0">
           <div className="text-base font-semibold text-slate-900 truncate">{titleCase(student.fullName)}</div>
           <div className="text-sm text-slate-500">
-            {titleCase(student.academic.classId)}-{titleCase(student.academic.sectionId)} • {student.mobile}
+            {titleCase(student.academic?.classId ?? 'NA')}-{titleCase(student.academic?.sectionId ?? 'NA')} • {student.mobile}
           </div>
         </div>
 

@@ -60,16 +60,37 @@ export async function getDocument<T extends DocumentData>(collectionName: string
 }
 
 /**
+ * Recursively remove undefined values from an object
+ * Firestore throws on undefined but accepts null
+ */
+function sanitizeData<T>(data: T): T {
+  if (data === null || data === undefined || typeof data !== 'object') {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data.map(sanitizeData) as unknown as T;
+  }
+  const sanitized: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data as Record<string, any>)) {
+    if (value !== undefined) {
+      sanitized[key] = sanitizeData(value);
+    }
+  }
+  return sanitized as T;
+}
+
+/**
  * Generic create document with auto-generated ID
  */
 export async function createDocument<T extends DocumentData>(collectionName: string, data: T) {
   if (!db) throw new Error('Firebase not configured');
+  const cleanData = sanitizeData(data);
   const docRef = await addDoc(collection(db, collectionName), {
-    ...data,
+    ...cleanData,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  return { id: docRef.id, ...data };
+  return { id: docRef.id, ...cleanData };
 }
 
 /**
@@ -105,11 +126,13 @@ export async function updateDocument<T extends Partial<DocumentData>>(
 ) {
   if (!db) throw new Error('Firebase not configured');
   const docRef = doc(db, collectionName, docId);
+  // Remove undefined values before sending to Firestore
+  const cleanData = sanitizeData(data);
   await updateDoc(docRef, {
-    ...data,
+    ...cleanData,
     updatedAt: serverTimestamp(),
   });
-  return { id: docId, ...data };
+  return { id: docId, ...cleanData };
 }
 
 /**

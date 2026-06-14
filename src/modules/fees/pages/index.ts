@@ -1,0 +1,1 @@
+export { FeeModuleView } from '../components/FeeModuleView';

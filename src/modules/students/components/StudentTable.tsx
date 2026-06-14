@@ -75,25 +75,24 @@ export function StudentTable({
               <tr key={r.id} className="hover:bg-slate-50">
                 <td className="px-4 py-3 align-top">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-200 text-slate-600 flex items-center justify-center">
+                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200 text-slate-600 flex items-center justify-center">
                       {r.photoUrl ? (
                         <img src={r.photoUrl} alt={r.fullName} className="h-full w-full object-cover" />
                       ) : (
                         <span className="text-sm font-semibold">{r.firstName[0]}</span>
                       )}
                     </div>
-                    <span className="text-slate-800">{r.fullName}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 align-top text-slate-700">{r.academic.admissionNo}</td>
-                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.academic.rollNo)}</td>
+                <td className="px-4 py-3 align-top text-slate-700">{r.academic?.admissionNo ?? '-'}</td>
+                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.academic?.rollNo ?? '-')}</td>
                 <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.fullName)}</td>
-                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.academic.classId)}</td>
-                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.academic.sectionId)}</td>
+                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.academic?.classId ?? '-')}</td>
+                <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.academic?.sectionId ?? '-')}</td>
                 <td className="px-4 py-3 align-top text-slate-700">{titleCase(r.gender)}</td>
                 <td className="px-4 py-3 align-top text-slate-700">{r.mobile}</td>
                 <td className="px-4 py-3 align-top text-slate-700">
-                  {r.academic.studentType === 'residential' ? 'Residential' : 'Day Scholar'}
+                  {r.academic?.studentType === 'residential' ? 'Residential' : 'Day Scholar'}
                 </td>
                 <td className="px-4 py-3 align-top">
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${

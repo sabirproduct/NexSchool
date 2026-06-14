@@ -34,7 +34,7 @@ export function App() {
           <Route path="/students/:id" element={<StudentDetailsPage />} />
           <Route path="/students/:id/edit" element={<EditStudentPage />} />
           <Route path="/students/promotions" element={<StudentPromotionPage />} />
-          <Route path="/admissions" element={<AdmissionsPage />} />
+          <Route path="/admissions/*" element={<AdmissionsPage />} />
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/academics" element={<AcademicsPage />} />
           <Route path="/exams" element={<ExamsPage />} />

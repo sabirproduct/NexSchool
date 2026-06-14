@@ -8,34 +8,56 @@ export function AttendanceFilters() {
 
   return (
     <form onSubmit={handleSubmit((v) => setFilters(v))}>
-      <div className="row g-3 mb-4">
-        <div className="col-12 col-md-2">
-          <label className="form-label">Class</label>
-          <select className="form-select form-select-sm" {...register('classId')}>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Class</label>
+          <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white" {...register('classId')}>
             <option value="">All</option>
             <option value="10">10</option>
             <option value="11">11</option>
           </select>
         </div>
-        <div className="col-12 col-md-2">
-          <label className="form-label">Section</label>
-          <select className="form-select form-select-sm" {...register('sectionId')}>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Section</label>
+          <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white" {...register('sectionId')}>
             <option value="">All</option>
             <option value="A">A</option>
             <option value="B">B</option>
           </select>
         </div>
-        <div className="col-12 col-md-2">
-          <label className="form-label">Date</label>
-          <input className="form-control form-control-sm" type="date" {...register('date', { required: true })} />
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+          <input
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            type="date"
+            {...register('date', { required: true })}
+          />
         </div>
-        <div className="col-12 col-md-4">
-          <label className="form-label">Subject (placeholder)</label>
-          <input className="form-control form-control-sm" {...register('subject')} />
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Subject</label>
+          <input
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            {...register('subject')}
+            placeholder="Any subject"
+          />
         </div>
-        <div className="col-12 col-md-2 d-flex align-items-end">
-          <button type="submit" className="btn btn-primary w-100 btn-sm">
+        <div className="flex items-end">
+          <button
+            type="submit"
+            className="w-full rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
             Apply
+          </button>
+        </div>
+        <div className="flex items-end">
+          <button
+            type="button"
+            onClick={() => {
+              setFilters({ classId: '', sectionId: '', date: '', subject: '', hostelId: '', roomId: '' });
+            }}
+            className="w-full rounded-lg border border-gray-300 text-gray-700 px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+          >
+            Clear
           </button>
         </div>
       </div>
