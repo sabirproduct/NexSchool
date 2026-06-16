@@ -2,152 +2,131 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
-    function role() { return userDoc().role; }
-    function isAdmin() { return role() in ['super_admin','school_admin','principal']; }
+
+    // Check if user exists in users collection
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Check user's role
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Admin roles that can perform write/delete operations
+    function isAdmin() {
+      return userExists() && getUserRole() in ['super_admin','school_admin','principal'];
+    }
+
+    // Higher-level admin roles (super_admin only for critical system operations)
+    function isSuperAdmin() {
+      return userExists() && getUserRole() == 'super_admin';
+    }
+
+    // Any authenticated user with a Firestore user doc
+    function isAuthenticatedUser() {
+      return signedIn() && userExists();
+    }
 
     match /students/{studentId} {
-      allow create: if true;  // Allow public create for student admission
-      allow read: if true;  // Allow reading students for list display
-      allow update: if true;  // Allow updates (using app-level auth);
-      allow delete: if signedIn() && isAdmin();
+      allow create: if true;
+      allow read: if isAuthenticatedUser();
+      allow update: if isAuthenticatedUser();
+      allow delete: if isAdmin();
     }
 
     match /parents/{parentId} {
-      allow read, write: if signedIn() && isAdmin();
+      allow read: if isAuthenticatedUser();
+      allow write: if isAdmin();
     }
 
-    match /studentDocuments/{docId} {
-      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
-      allow write: if signedIn() && isAdmin();
+    match /classes/{id} {
+      allow read: if isAuthenticatedUser();
+      allow write: if isAdmin();
+    }
+    match /sections/{id} {
+      allow read: if isAuthenticatedUser();
+      allow write: if isAdmin();
+    }
+    match /hostels/{id} {
+      allow read: if isAuthenticatedUser();
+      allow write: if isAdmin();
+    }
+    match /subjects/{id} {
+      allow read: if isAuthenticatedUser();
+      allow write: if isAdmin();
+    }
+    match /academicSessions/{id} {
+      allow read: if isAuthenticatedUser();
+      allow write: if isAdmin();
     }
 
-    match /studentPromotions/{promotionId} {
-      allow read: if signedIn();
-      allow write: if signedIn() && isAdmin();
-    }
-
-    match /classes/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /sections/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /hostels/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-
-    match /academicSessions/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /subjects/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /classSubjects/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /teacherAssignments/{id} {
-      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
-      allow write: if signedIn() && isAdmin();
-    }
-    match /periods/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /academicCalendar/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /curriculum/{id} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /homework/{id} {
-      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
-      allow write: if signedIn() && (isAdmin() || role() == 'teacher');
-    }
-    match /timetables/{timetableId} {
-      allow read: if signedIn() && (
-        isAdmin() ||
-        role() == 'teacher' ||
-        role() == 'student' ||
-        role() == 'parent'
-      );
-      allow create, update, delete: if signedIn() && isAdmin();
-    }
     match /admissionApplications/{applicationId} {
       allow create: if true;
-      allow read: if signedIn() && isAdmin();
-      allow update: if signedIn() && isAdmin();
-      allow delete: if signedIn() && role() == 'super_admin';
-    }
-    match /admissionEnquiries/{enquiryId} {
-      allow create: if true;
-      allow read, update, delete: if signedIn() && isAdmin();
-    }
-    match /admissionReviews/{reviewId} {
-      allow read, write: if signedIn() && isAdmin();
-    }
-    match /admissionDocuments/{documentId} {
-      allow create: if true;
-      allow read, update, delete: if signedIn() && isAdmin();
-    }
-    match /admissionFees/{feeId} {
-      allow read, write: if signedIn() && isAdmin();
-    }
-    match /notifications/{notificationId} {
-      allow create: if signedIn() && isAdmin();
-      allow read: if signedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow update, delete: if signedIn() && isAdmin();
+      allow read, update: if isAuthenticatedUser();
+      allow delete: if isAdmin();
     }
 
+    match /notifications/{notificationId} {
+      allow create: if isAdmin();
+      allow read: if isAuthenticatedUser();
+      allow update, delete: if isAdmin();
+    }
 
     match /studentAttendance/{attendanceId} {
-      allow read: if signedIn() && (
-        isAdmin() ||
-        (role() == 'teacher' && resource.data.classId in userDoc().assignedClassIds) ||
-        (role() == 'student' && resource.data.studentId == request.auth.uid) ||
-        (role() == 'parent' && resource.data.studentId in userDoc().studentIds)
-      );
-      allow create, update: if signedIn() && (isAdmin() || role() == 'teacher');
-      allow delete: if signedIn() && isAdmin();
+      allow read: if isAuthenticatedUser();
+      allow create, update: if isAuthenticatedUser();
+      allow delete: if isAdmin();
     }
-
-    match /teacherAttendance/{attendanceId} {
-      allow read: if signedIn() && (isAdmin() || role() in ['teacher','accountant']);
-      allow write: if signedIn() && isAdmin();
-    }
-
-    match /hostelAttendance/{recordId} {
-      allow read: if signedIn() && (isAdmin() || role() in ['hostel_warden','teacher']);
-      allow write: if signedIn() && (isAdmin() || role() == 'hostel_warden');
-    }
-
-    match /attendanceSummary/{studentId} {
-      allow read: if signedIn() && (isAdmin() || request.auth.uid == studentId || studentId in userDoc().studentIds || role() == 'teacher');
-      allow write: if signedIn() && isAdmin();
-    }
-
-    match /attendanceLogs/{logId} { allow read, write: if signedIn() && isAdmin(); }
-    match /leaveApplications/{leaveId} { allow read: if signedIn(); allow write: if signedIn(); }
-    match /attendanceSettings/{settingId} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-
-
 
     match /exams/{examId} {
-      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
-      allow create, update, delete: if signedIn() && isAdmin();
-    }
-
-    match /examSchedules/{scheduleId} {
-      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
-      allow create, update, delete: if signedIn() && (isAdmin() || role() == 'teacher');
+      allow read: if isAuthenticatedUser();
+      allow create, update, delete: if isAdmin();
     }
 
     match /marks/{markId} {
-      allow read: if signedIn() && (isAdmin() || role() in ['teacher','student','parent']);
-      allow create, update: if signedIn() && (
-        isAdmin() ||
-        (role() == 'teacher' && request.resource.data.subjectId in userDoc().assignedSubjectIds)
-      );
-      allow delete: if signedIn() && isAdmin();
+      allow read: if isAuthenticatedUser();
+      allow create, update: if isAuthenticatedUser();
+      allow delete: if isAdmin();
     }
 
-    match /results/{resultId} {
-      allow read: if signedIn() && (
-        isAdmin() ||
-        role() == 'teacher' ||
-        (role() == 'student' && resource.data.studentId == request.auth.uid) ||
-        (role() == 'parent' && resource.data.studentId in userDoc().studentIds)
-      );
-      allow create, update, delete: if signedIn() && isAdmin();
+    match /gradeRules/{ruleId} {
+      allow read: if isAuthenticatedUser();
+      allow write: if isAdmin();
     }
 
-    match /gradeRules/{ruleId} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /reportCards/{reportCardId} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /resultAnalytics/{analyticsId} { allow read: if signedIn() && (isAdmin() || role() == 'teacher'); allow write: if signedIn() && isAdmin(); }
-    match /studentRanks/{rankId} { allow read: if signedIn(); allow write: if signedIn() && isAdmin(); }
-    match /examAttendance/{attendanceId} { allow read: if signedIn(); allow write: if signedIn() && (isAdmin() || role() == 'teacher'); }
+    match /timetables/{timetableId} {
+      allow read: if isAuthenticatedUser();
+      allow create, update, delete: if isAdmin();
+    }
 
-    match /{document=**} { allow read, write: if signedIn() && role() == 'super_admin'; }
+    // ========== SYSTEM CONFIG ==========
+    match /systemRoles/{roleId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      // Allow access to own user document or any user if admin
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      // Allow a user to create/update their own document (needed during user creation flow
+      // where createUserWithEmailAndPassword signs in the new user temporarily),
+      // or admins to create/update any user doc
+      allow create, update: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Fees collection
+    match /fees/{feeId} {
+      allow read: if isAuthenticatedUser();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Everything else
+    match /{document=**} {
+      allow read: if isAuthenticatedUser();
+      allow write: if isAdmin();
+    }
   }
 }

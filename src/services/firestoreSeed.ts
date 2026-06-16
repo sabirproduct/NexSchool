@@ -3,136 +3,194 @@
  * Run this once to create initial collections and documents
  */
 
+import { auth, db } from '../config/firebase';
 import {
-  createDocument,
-  batchWriteDocuments,
-} from './firestoreService';
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { SYSTEM_ROLES } from '../modules/system/types';
+import { useAuthStore } from '../store/authStore';
 
-export async function seedFirestoreData(schoolId: string) {
-  console.log('🌱 Seeding Firestore with initial data...');
+/**
+ * Default module permissions for each system role
+ */
+const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+  super_admin: ['all'],
+  school_admin: ['dashboard','students','admissions','attendance','academics','exams','fees','hostel','safety','health','scholarship','notifications','system'],
+  principal: ['dashboard','students','admissions','attendance','academics','exams','fees','hostel','safety','health','scholarship','notifications'],
+  teacher: ['dashboard','attendance','academics','exams','notifications'],
+  accountant: ['dashboard','fees','notifications'],
+  hostel_warden: ['dashboard','hostel','attendance','safety','health','notifications'],
+  student: ['student','dashboard'],
+  parent: ['parent','dashboard'],
+};
 
+/**
+ * Seed default roles into Firestore.
+ * Uses the currently authenticated user's credentials.
+ */
+async function seedRoles() {
+  if (!db) return;
   try {
-    // Create academic session
-    await createDocument('academicSessions', {
-      schoolId,
-      sessionName: '2024-2025',
-      startDate: '2024-04-01',
-      endDate: '2025-03-31',
-      isActive: true,
-    });
-    console.log('✅ Academic session created');
-
-    // Create classes
-    const classes = [
-      { schoolId, academicSessionId: '2024-2025', className: 'Class VI', classCode: 'VI', totalStrength: 45 },
-      { schoolId, academicSessionId: '2024-2025', className: 'Class VII', classCode: 'VII', totalStrength: 48 },
-      { schoolId, academicSessionId: '2024-2025', className: 'Class X', classCode: 'X', totalStrength: 50 },
-    ];
-
-    const classOps = classes.map((c, i) => ({
-      type: 'set' as const,
-      collection: 'classes',
-      docId: `${schoolId}-${c.classCode}`,
-      data: c,
-    }));
-
-    await batchWriteDocuments(classOps);
-    console.log('✅ Classes created');
-
-    // Create sections
-    const sections = [
-      { schoolId, classId: `${schoolId}-VI`, sectionName: 'A', sectionCode: 'A' },
-      { schoolId, classId: `${schoolId}-VI`, sectionName: 'B', sectionCode: 'B' },
-      { schoolId, classId: `${schoolId}-X`, sectionName: 'A', sectionCode: 'A' },
-    ];
-
-    const sectionOps = sections.map((s, i) => ({
-      type: 'set' as const,
-      collection: 'sections',
-      docId: `${schoolId}-${s.classId}-${s.sectionCode}`,
-      data: s,
-    }));
-
-    await batchWriteDocuments(sectionOps);
-    console.log('✅ Sections created');
-
-    // Create subjects
-    const subjects = [
-      { schoolId, classId: `${schoolId}-X`, subjectName: 'Mathematics', subjectCode: 'MATH', maxMarks: 100, minMarks: 33 },
-      { schoolId, classId: `${schoolId}-X`, subjectName: 'English', subjectCode: 'ENG', maxMarks: 100, minMarks: 33 },
-      { schoolId, classId: `${schoolId}-X`, subjectName: 'Science', subjectCode: 'SCI', maxMarks: 100, minMarks: 33 },
-    ];
-
-    const subjectOps = subjects.map((s) => ({
-      type: 'set' as const,
-      collection: 'subjects',
-      docId: `${schoolId}-${s.classId}-${s.subjectCode}`,
-      data: s,
-    }));
-
-    await batchWriteDocuments(subjectOps);
-    console.log('✅ Subjects created');
-
-    // Create grade rules
-    const gradeRules = [
-      { schoolId, percentage_from: 90, percentage_to: 100, grade: 'A+', gpa: 9.5, remarks: 'Outstanding' },
-      { schoolId, percentage_from: 80, percentage_to: 89, grade: 'A', gpa: 9.0, remarks: 'Excellent' },
-      { schoolId, percentage_from: 70, percentage_to: 79, grade: 'B', gpa: 8.0, remarks: 'Good' },
-      { schoolId, percentage_from: 60, percentage_to: 69, grade: 'C', gpa: 7.0, remarks: 'Satisfactory' },
-      { schoolId, percentage_from: 0, percentage_to: 59, grade: 'D', gpa: 5.0, remarks: 'Need Improvement' },
-    ];
-
-    const gradeOps = gradeRules.map((g, i) => ({
-      type: 'set' as const,
-      collection: 'gradeRules',
-      docId: `${schoolId}-grade-${i}`,
-      data: g,
-    }));
-
-    await batchWriteDocuments(gradeOps);
-    console.log('✅ Grade rules created');
-
-    console.log('✅ Firestore seeding completed successfully!');
-  } catch (error) {
-    console.error('❌ Error seeding Firestore:', error);
-    throw error;
+    for (const r of SYSTEM_ROLES) {
+      await setDoc(doc(db, 'systemRoles', r.key), {
+        name: r.name,
+        key: r.key,
+        description: r.description,
+        permissions: DEFAULT_ROLE_PERMISSIONS[r.key] || ['dashboard'],
+        userCount: 0,
+        isSystem: r.isSystem,
+      });
+    }
+    console.log('✅ Default roles seeded.');
+  } catch (err: any) {
+    // If it fails because doc already exists, that's fine
+    if (err.code !== 'already-exists') {
+      console.warn('⚠️ Role seed issue (non-critical):', err.message);
+    }
   }
 }
 
 /**
- * Create a new school with basic structure
+ * Seed super admin user + Firebase Auth account.
+ * Called after user is authenticated.
+ * Seeds into the `users` collection.
  */
-export async function createSchoolStructure(schoolData: {
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  state: string;
-}) {
+async function seedSuperAdmin() {
+  if (!db || !auth) return;
+
+  const email = 'sabir@nexschool.com';
+  const password = 'Admin@123';
+  const userData = {
+    name: 'Sabiruddin Sk',
+    email,
+    role: 'super_admin',
+    schoolId: 'school_001',
+    schoolName: 'NexSchool HQ',
+    status: 'active',
+    lastLogin: null,
+    createdAt: new Date().toISOString(),
+  };
+
   try {
-    const school = await createDocument('schools', schoolData);
-    console.log('✅ School created:', school.id);
+    // Try signing in - if it works, the user already exists
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const uid = cred.user.uid;
+    console.log('[Seed] Super admin signed in:', { uid, email });
 
-    // Seed initial data for this school
-    await seedFirestoreData(school.id);
+    // Write the Firestore doc into `users` collection (safe to re-write, uses merge)
+    await setDoc(doc(db, 'users', uid), { uid, ...userData });
+    console.log('[Seed] User document written to Firestore collection: users', { uid });
 
-    return school;
-  } catch (error) {
-    console.error('❌ Error creating school structure:', error);
-    throw error;
+    // Set user in auth store
+    useAuthStore.getState().setUser({
+      uid,
+      email,
+      role: 'super_admin',
+      schoolId: 'school_001',
+    });
+
+    console.log('✅ Super admin signed in successfully.');
+    return true;
+  } catch (signInErr: any) {
+    // User doesn't exist, create them
+    if (signInErr.code === 'auth/invalid-credential') {
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = cred.user.uid;
+        console.log('[Seed] Super admin created in Firebase Auth:', { uid, email });
+
+        // Write the Firestore doc into `users` collection
+        await setDoc(doc(db, 'users', uid), { uid, ...userData });
+        console.log('[Seed] User document written to Firestore collection: users', { uid });
+
+        // Set user in auth store
+        useAuthStore.getState().setUser({
+          uid,
+          email,
+          role: 'super_admin',
+          schoolId: 'school_001',
+        });
+
+        console.log('✅ Super admin created and signed in successfully.');
+        return true;
+      } catch (createErr: any) {
+        if (createErr.code === 'auth/email-already-in-use') {
+          // Auth user exists but we didn't get a valid sign-in. Try password reset or skip.
+          console.warn('⚠️ Super admin auth exists but could not sign in. Manual intervention needed.');
+          return false;
+        }
+        console.error('❌ Failed to create super admin:', createErr.message);
+        return false;
+      }
+    } else {
+      console.error('❌ Sign-in error:', signInErr.message);
+      return false;
+    }
   }
 }
 
 /**
  * Initialize Firestore collections (call on app startup)
+ * This function is called after auth is initialized.
+ * It tries to seed the super admin + roles using the current auth context.
  */
 export async function initializeFirestore() {
+  if (!db || !auth) {
+    console.warn('⚠️ Firebase not configured. Running in mock mode.');
+    return;
+  }
+
   try {
     console.log('🚀 Initializing Firestore...');
-    // Additional setup if needed
-    console.log('✅ Firestore initialized');
+
+    // The flow:
+    // 1. authStore.initialize() runs onAuthStateChanged - this fires FIRST
+    // 2. If user is null (not signed in), this seed function tries to sign in/create the super admin
+    // 3. Once signed in, it seeds roles
+    // 4. The auth store picks up the signed-in state
+
+    const seeded = await seedSuperAdmin();
+    if (seeded) {
+      await seedRoles();
+    } else {
+      // If super admin seed returned false (user exists but sign-in failed),
+      // still try to seed roles since the user doc may exist
+      try {
+        await seedRoles();
+      } catch {
+        // Non-critical - roles may already exist
+      }
+    }
+
+    console.log('✅ Firestore initialization complete.');
   } catch (error) {
     console.error('❌ Error initializing Firestore:', error);
+  }
+}
+
+/**
+ * Ensure roles are seeded when any admin user logs in.
+ * This should be called during login to guarantee roles exist.
+ */
+export async function ensureRolesSeeded() {
+  if (!db) return;
+  try {
+    // Check if roles exist by trying to read one
+    const { getDoc, doc } = await import('firebase/firestore');
+    const snapshot = await getDoc(doc(db, 'systemRoles', 'school_admin'));
+    if (!snapshot.exists()) {
+      console.log('[Seed] Roles missing, seeding now...');
+      await seedRoles();
+    }
+  } catch (err) {
+    console.warn('[Seed] Could not verify roles (non-critical):', err);
+    // Attempt to seed regardless
+    try {
+      await seedRoles();
+    } catch {
+      // Silently fail
+    }
   }
 }

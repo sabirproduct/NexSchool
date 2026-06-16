@@ -1,0 +1,1 @@
+export { HealthModuleView } from '../components/HealthModuleView';

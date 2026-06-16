@@ -1,0 +1,1 @@
+export { SafetyModuleView } from '../components/SafetyModuleView';

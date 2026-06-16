@@ -1,0 +1,1 @@
+export { ScholarshipModuleView } from '../components/ScholarshipModuleView';

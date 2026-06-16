@@ -13,6 +13,7 @@ export interface AppUser {
   email: string;
   role: UserRole;
   schoolId: string;
+  name?: string;
   studentIds?: string[];
   assignedClassIds?: string[];
 }

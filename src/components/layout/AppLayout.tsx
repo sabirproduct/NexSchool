@@ -1,36 +1,99 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import NexSchoolLogo from './NexSchoolLogo';
+import { Icons } from './SidebarIcons';
+import { fetchAllRoles } from '../../modules/system/services/systemService';
+import { roleModules } from '../../config/roles';
+import { UserRole } from '../../types';
 
 const sidebarWidth = 280;
 
-const items = [
-  { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Students', to: '/students' },
-  { label: 'Admissions', to: '/admissions' },
-  { label: 'Attendance', to: '/attendance' },
-  { label: 'Academics', to: '/academics' },
-  { label: 'Exams', to: '/exams' },
-  { label: 'Fees', to: '/fees' },
-  { label: 'Hostel', to: '/hostel' },
-  { label: 'Notifications', to: '/notifications' },
-  { label: 'Parent Portal', to: '/parent' },
-  { label: 'Student Portal', to: '/student' },
+interface MenuItem {
+  label: string;
+  to: string;
+  icon: () => JSX.Element;
+  module: string;
+}
+
+const ALL_MENU_ITEMS: MenuItem[] = [
+  { label: 'Dashboard', to: '/dashboard', icon: Icons.Dashboard, module: 'dashboard' },
+  { label: 'Students', to: '/students', icon: Icons.Students, module: 'students' },
+  { label: 'Admissions', to: '/admissions', icon: Icons.Admissions, module: 'admissions' },
+  { label: 'Attendance', to: '/attendance', icon: Icons.Attendance, module: 'attendance' },
+  { label: 'Academics', to: '/academics', icon: Icons.Academics, module: 'academics' },
+  { label: 'Exams', to: '/exams', icon: Icons.Exams, module: 'exams' },
+  { label: 'Fees', to: '/fees', icon: Icons.Fees, module: 'fees' },
+  { label: 'Hostel', to: '/hostel', icon: Icons.Hostel, module: 'hostel' },
+  // ⭐ Premium Modules
+  { label: 'Safety Dashboard', to: '/safety', icon: Icons.Safety, module: 'safety' },
+  { label: 'Health & Wellness', to: '/health', icon: Icons.Health, module: 'health' },
+  { label: 'Scholarships', to: '/scholarship', icon: Icons.Scholarship, module: 'scholarship' },
+  { label: 'Notifications', to: '/notifications', icon: Icons.Notifications, module: 'notifications' },
+  { label: 'Parent Portal', to: '/parent', icon: Icons.ParentPortal, module: 'parent' },
+  { label: 'Student Portal', to: '/student', icon: Icons.StudentPortal, module: 'student' },
+  { label: 'System Config', to: '/system', icon: Icons.SystemConfig, module: 'system' },
 ];
+
+/**
+ * Check if a module is allowed for the given role permissions
+ */
+function isModuleAllowed(module: string, permissions: string[]): boolean {
+  if (permissions.includes('all')) return true;
+  return permissions.includes(module);
+}
 
 export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const setUser = useAuthStore((s) => s.setUser);
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const [rolePermissions, setRolePermissions] = useState<string[]>([]);
+  const [loadingMenu, setLoadingMenu] = useState(true);
+
+  // Use hardcoded role config as fallback so permissions work even before Firestore roles are seeded
+  const fallbackPermissions = useMemo(() => {
+    if (!user) return ['dashboard'];
+    return roleModules[user.role as UserRole] || ['dashboard'];
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    // Load role permissions from Firestore
+    async function loadPermissions() {
+      try {
+        const roles = await fetchAllRoles();
+        const currentRole = roles.find((r) => r.key === user!.role);
+        if (currentRole) {
+          setRolePermissions(currentRole.permissions);
+        } else {
+          // Fallback: use hardcoded config from roles.ts which always has the correct permissions
+          setRolePermissions(fallbackPermissions);
+        }
+      } catch (err) {
+        console.error('Failed to load role permissions:', err);
+        // Fallback: use hardcoded config from roles.ts
+        setRolePermissions(fallbackPermissions);
+      } finally {
+        setLoadingMenu(false);
+      }
+    }
+    loadPermissions();
+  }, [user, fallbackPermissions]);
+
+  const items = ALL_MENU_ITEMS.filter((item) =>
+    isModuleAllowed(item.module, rolePermissions)
+  );
+
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -49,25 +112,34 @@ export function AppLayout() {
           ×
         </button>
       </div>
-      <nav className="space-y-1">
-        {items.map((item) => {
-          const active = location.pathname === item.to;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`block px-4 py-3 rounded-lg font-medium transition-all ${
-                active
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              onClick={() => setMobileNavOpen(false)}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {loadingMenu ? (
+        <nav className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-10 bg-gray-100 rounded-lg animate-pulse" />
+          ))}
+        </nav>
+      ) : (
+        <nav className="space-y-1">
+          {items.map((item) => {
+            const active = location.pathname === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all ${
+                  active
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+                onClick={() => setMobileNavOpen(false)}
+              >
+                <span className={`flex-shrink-0 ${active ? 'text-white' : 'text-gray-500'}`}>{item.icon()}</span>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </>
   );
 
@@ -102,7 +174,19 @@ export function AppLayout() {
         {/* Top bar — sticky within its column */}
         <div className="flex-shrink-0 px-6 py-4 flex items-center justify-between border-b border-gray-200 bg-white gap-3">
           <h1 className="text-2xl font-bold text-gray-900">NexSchool SMS</h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            {/* User info */}
+            {user && (
+              <div className="hidden lg:flex items-center gap-3 pr-4 border-r border-gray-200">
+                <div className="flex flex-col items-end">
+                  <span className="text-sm font-semibold text-gray-900">{user.name || user.email}</span>
+                  <span className="text-xs text-gray-500 capitalize">{user.role.replace(/_/g, ' ')}</span>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                  {(user.name || user.email).charAt(0).toUpperCase()}
+                </div>
+              </div>
+            )}
             <button
               type="button"
               className="hidden lg:inline-flex items-center justify-center rounded-lg bg-red-50 text-red-700 border border-red-200 px-4 py-2 text-sm font-medium hover:bg-red-100 transition-colors"

@@ -1,5 +1,6 @@
 import { FirebaseApp, FirebaseOptions, initializeApp } from 'firebase/app';
 import { Firestore, getFirestore } from 'firebase/firestore';
+import { Auth, getAuth, connectAuthEmulator } from 'firebase/auth';
 import { Analytics, getAnalytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig: FirebaseOptions = {
@@ -17,11 +18,13 @@ const hasConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && f
 let app: FirebaseApp | null = null;
 let analytics: Analytics | null = null;
 let db: Firestore | null = null;
+let auth: Auth | null = null;
 
 if (hasConfig) {
   try {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
+    auth = getAuth(app);
     // Analytics may not be supported in all environments (e.g., local dev, extensions)
     isSupported().then((supported) => {
       if (supported) {
@@ -37,10 +40,11 @@ if (hasConfig) {
     console.error('❌ Firebase initialization error:', error);
     app = null;
     db = null;
+    auth = null;
     analytics = null;
   }
 } else {
   console.warn('⚠️ Firebase configuration incomplete. Running in mock mode.');
 }
 
-export { db, analytics };
+export { db, analytics, auth };

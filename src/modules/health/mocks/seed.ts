@@ -1,0 +1,32 @@
+import { HealthRecord, Vaccination, Allergy, MenstrualHealthRecord } from '../types';
+
+export const mockHealthRecords: HealthRecord[] = [
+  { id: 'h1', studentId: 'STU001', studentName: 'Ananya Sharma', classId: 'cls10', class: '10-A', date: '2026-06-10', category: 'General Checkup', description: 'Regular monthly checkup - vitals normal', severity: 'Mild', diagnosis: 'Normal', doctorName: 'Dr. Meera Patel', clinicVisit: true, createdAt: '2026-06-10T09:00:00Z', updatedAt: '2026-06-10T09:00:00Z' },
+  { id: 'h2', studentId: 'STU002', studentName: 'Bhavna Reddy', classId: 'cls9', class: '9-B', date: '2026-06-08', category: 'Illness', description: 'Severe headache and fever since 2 days', severity: 'Moderate', diagnosis: 'Viral Fever', treatment: 'Paracetamol 500mg, rest for 3 days', medication: 'Paracetamol 500mg - thrice daily', followUpDate: '2026-06-11', doctorName: 'Dr. Sunil Verma', clinicVisit: true, createdAt: '2026-06-08T14:30:00Z', updatedAt: '2026-06-08T14:30:00Z' },
+  { id: 'h3', studentId: 'STU003', studentName: 'Priya Kumari', classId: 'cls11', class: '11-A', date: '2026-06-05', category: 'Injury', description: 'Sprained ankle during sports practice', severity: 'Moderate', diagnosis: 'Grade 1 Ankle Sprain', treatment: 'RICE therapy, compression bandage', medication: 'Ibuprofen 400mg as needed', followUpDate: '2026-06-12', doctorName: 'Dr. Rohan Gupta', clinicVisit: true, createdAt: '2026-06-05T16:00:00Z', updatedAt: '2026-06-05T16:00:00Z' },
+  { id: 'h4', studentId: 'STU004', studentName: 'Kavita Singh', classId: 'cls12', class: '12-A', date: '2026-06-01', category: 'Menstrual Health', description: 'Cramps and discomfort - provided awareness counseling', severity: 'Mild', treatment: 'Heat pad, rest, iron supplements', medication: 'Iron supplement daily', clinicVisit: false, createdAt: '2026-06-01T10:00:00Z', updatedAt: '2026-06-01T10:00:00Z' },
+  { id: 'h5', studentId: 'STU005', studentName: 'Riya Das', classId: 'cls10', class: '10-B', date: '2026-05-28', category: 'Vaccination', description: 'HPV Vaccine - 1st dose administered', severity: 'Mild', doctorName: 'Dr. Meera Patel', clinicVisit: true, createdAt: '2026-05-28T11:00:00Z', updatedAt: '2026-05-28T11:00:00Z' },
+  { id: 'h6', studentId: 'STU006', studentName: 'Sneha Gupta', classId: 'cls9', class: '9-A', date: '2026-05-25', category: 'Emergency', description: 'Acute abdominal pain - referred to hospital', severity: 'Emergency', diagnosis: 'Acute Appendicitis (suspected)', treatment: 'Referred to District Hospital for further evaluation', doctorName: 'Dr. Sunil Verma', clinicVisit: true, createdAt: '2026-05-25T20:00:00Z', updatedAt: '2026-05-25T20:00:00Z' },
+  { id: 'h7', studentId: 'STU007', studentName: 'Aarti Patel', classId: 'cls11', class: '11-B', date: '2026-05-20', category: 'Dental', description: 'Toothache due to cavity', severity: 'Moderate', diagnosis: 'Dental Caries', treatment: 'Dental filling scheduled', followUpDate: '2026-05-27', doctorName: 'Dr. Priya Dental Care', clinicVisit: true, createdAt: '2026-05-20T09:30:00Z', updatedAt: '2026-05-20T09:30:00Z' },
+  { id: 'h8', studentId: 'STU008', studentName: 'Neha Verma', classId: 'cls8', class: '8-A', date: '2026-05-18', category: 'General Checkup', description: 'Vision screening - identified need for glasses', severity: 'Mild', diagnosis: 'Myopia (mild)', treatment: 'Prescribed corrective glasses', doctorName: 'Dr. Vision Care', clinicVisit: true, createdAt: '2026-05-18T10:00:00Z', updatedAt: '2026-05-18T10:00:00Z' },
+];
+
+export const mockVaccinations: Vaccination[] = [
+  { id: 'v1', studentId: 'STU001', studentName: 'Ananya Sharma', vaccinationName: 'HPV (1st dose)', scheduledDate: '2026-06-15', administeredDate: '2026-06-15', status: 'Completed', administeredBy: 'Dr. Meera Patel', batchNo: 'HPV-B001', notes: 'No adverse reaction', createdAt: '2026-06-15T10:00:00Z' },
+  { id: 'v2', studentId: 'STU002', studentName: 'Bhavna Reddy', vaccinationName: 'HPV (1st dose)', scheduledDate: '2026-06-20', status: 'Pending', createdAt: '2026-06-01T09:00:00Z' },
+  { id: 'v3', studentId: 'STU003', studentName: 'Priya Kumari', vaccinationName: 'HPV (1st dose)', scheduledDate: '2026-07-01', status: 'Pending', createdAt: '2026-06-01T09:00:00Z' },
+  { id: 'v4', studentId: 'STU004', studentName: 'Kavita Singh', vaccinationName: 'Typhoid', scheduledDate: '2026-05-01', administeredDate: '2026-05-01', status: 'Completed', administeredBy: 'Dr. Sunil Verma', batchNo: 'TY-B002', createdAt: '2026-05-01T10:00:00Z' },
+  { id: 'v5', studentId: 'STU005', studentName: 'Riya Das', vaccinationName: 'Hepatitis B (Booster)', scheduledDate: '2026-04-15', administeredDate: '2026-04-10', status: 'Completed', administeredBy: 'Dr. Meera Patel', batchNo: 'HEP-B003', createdAt: '2026-04-10T10:00:00Z' },
+];
+
+export const mockAllergies: Allergy[] = [
+  { id: 'a1', studentId: 'STU001', studentName: 'Ananya Sharma', allergen: 'Peanuts', reaction: 'Skin rash, itching', severity: 'Moderate', medication: 'Antihistamine', notes: 'Must avoid all peanut products in mess', createdAt: '2026-01-15T09:00:00Z' },
+  { id: 'a2', studentId: 'STU003', studentName: 'Priya Kumari', allergen: 'Dust', reaction: 'Sneezing, watery eyes', severity: 'Mild', medication: 'Cetirizine as needed', createdAt: '2026-02-10T09:00:00Z' },
+  { id: 'a3', studentId: 'STU006', studentName: 'Sneha Gupta', allergen: 'Penicillin', reaction: 'Severe rash, difficulty breathing', severity: 'Severe', notes: 'EMERGENCY: Allergic to Penicillin group - flagged in system', createdAt: '2026-03-05T09:00:00Z' },
+];
+
+export const mockMenstrualHealthRecords: MenstrualHealthRecord[] = [
+  { id: 'mh1', studentId: 'STU004', studentName: 'Kavita Singh', recordDate: '2026-06-01', cyclePhase: 'Menstrual', symptoms: ['Cramps', 'Fatigue', 'Mood swings'], wellnessScore: 5, requiresFollowUp: false, privacyLevel: 'confidential', createdAt: '2026-06-01T10:00:00Z' },
+  { id: 'mh2', studentId: 'STU002', studentName: 'Bhavna Reddy', recordDate: '2026-06-10', cyclePhase: 'Follicular', symptoms: ['Mild cramps'], wellnessScore: 7, requiresFollowUp: false, privacyLevel: 'medical_only', createdAt: '2026-06-10T09:00:00Z' },
+  { id: 'mh3', studentId: 'STU005', studentName: 'Riya Das', recordDate: '2026-06-12', cyclePhase: 'Menstrual', symptoms: ['Severe cramps', 'Nausea', 'Headache'], wellnessScore: 3, requiresFollowUp: true, notes: 'Student reported severe pain - counseled on pain management', privacyLevel: 'confidential', createdAt: '2026-06-12T14:00:00Z' },
+];

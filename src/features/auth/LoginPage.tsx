@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -8,12 +9,22 @@ type LoginForm = { email: string; password: string };
 
 export function LoginPage() {
   const { register, handleSubmit } = useForm<LoginForm>();
-  const setUser = useAuthStore((s) => s.setUser);
+  const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit = ({ email }: LoginForm) => {
-    setUser({ uid: 'demo', email, role: 'super_admin', schoolId: 'school_001' });
-    navigate('/dashboard');
+  const onSubmit = async ({ email, password }: LoginForm) => {
+    setError('');
+    setLoading(true);
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err?.message || 'Invalid email or password');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -46,6 +57,13 @@ export function LoginPage() {
             <p className="text-slate-500 mt-2">Sign in to your NexSchool account</p>
           </div>
 
+          {/* Error message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 text-center">
+              {error}
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
@@ -68,9 +86,10 @@ export function LoginPage() {
             </div>
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl transition-colors shadow-lg shadow-blue-200"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl transition-colors shadow-lg shadow-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Sign In
+              {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
@@ -87,7 +106,8 @@ export function LoginPage() {
           {/* Demo hint */}
           <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-xl">
             <p className="text-sm text-amber-800 text-center">
-              <span className="font-semibold">Demo:</span> Use any email/password to sign in.
+              <span className="font-semibold">Demo Credentials:</span><br />
+              <span className="text-xs">sabir@nexschool.com / Admin@123</span>
             </p>
           </div>
         </div>
