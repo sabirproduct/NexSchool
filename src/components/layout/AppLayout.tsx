@@ -173,7 +173,7 @@ export function AppLayout() {
       <div className="flex flex-col flex-grow min-w-0">
         {/* Top bar — sticky within its column */}
         <div className="flex-shrink-0 px-6 py-4 flex items-center justify-between border-b border-gray-200 bg-white gap-3">
-          <h1 className="text-2xl font-bold text-gray-900">NexSchool SMS</h1>
+          <h1 className="text-2xl font-bold text-gray-900">NexSchool ERP</h1>
           <div className="flex items-center gap-4">
             {/* User info */}
             {user && (

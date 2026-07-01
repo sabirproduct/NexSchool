@@ -6,10 +6,10 @@ export function ConfirmDeleteDialog({ open, onClose, onConfirm }: { open: boolea
       <div className="modal-dialog modal-dialog-centered">
         <div className="modal-content">
           <div className="modal-header">
-            <h5 className="modal-title">Deactivate student?</h5>
+            <h5 className="modal-title">Delete student?</h5>
             <button type="button" className="btn-close" aria-label="Close" onClick={onClose}></button>
           </div>
-          <div className="modal-body">This will soft delete the student by marking status as inactive.</div>
+          <div className="modal-body">This will permanently delete the student from the database. This action cannot be undone.</div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancel

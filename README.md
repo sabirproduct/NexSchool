@@ -1,4 +1,4 @@
-# NexSchool SMS MVP
+# NexSchool ERP MVP
 
 A production-style MVP scaffold for a School Management System with React + Firebase.
 

@@ -75,7 +75,7 @@ export function SuperAdminDashboard() {
         {[
           { label: 'Total Students', value: totalStudents.toLocaleString(), icon: '👨‍🎓', change: '+8%', color: COLORS.primary },
           { label: 'Total Teachers', value: totalTeachers.toString(), icon: '👨‍🏫', change: '+5%', color: COLORS.success },
-          { label: 'Annual Revenue', value: '₹1.62Cr', icon: '💰', change: '+12%', color: COLORS.warning },
+          { label: 'Pass Rate', value: '89%', icon: '🎯', change: '+6%', color: COLORS.warning },
           { label: 'Avg Attendance', value: `${avgAttendance}%`, icon: '📊', change: '+3%', color: COLORS.teal },
         ].map(kpi => (
           <div key={kpi.label} className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:shadow-lg transition-all">
@@ -221,20 +221,54 @@ export function SuperAdminDashboard() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'View Reports', icon: '📊', desc: 'Institution-wide analytics', color: 'from-indigo-500 to-indigo-600' },
-          { label: 'Fee Overview', icon: '💰', desc: 'Revenue & collection status', color: 'from-emerald-500 to-emerald-600' },
-          { label: 'Staff Management', icon: '👥', desc: 'Manage teachers & staff', color: 'from-purple-500 to-purple-600' },
-          { label: 'System Settings', icon: '⚙️', desc: 'Configure school preferences', color: 'from-amber-500 to-amber-600' },
-        ].map(action => (
-          <div key={action.label} className={`bg-gradient-to-r ${action.color} rounded-2xl p-4 shadow-lg text-white cursor-pointer hover:scale-[1.02] transition-transform`}>
-            <span className="text-2xl">{action.icon}</span>
-            <p className="text-sm font-semibold mt-2">{action.label}</p>
-            <p className="text-xs text-white/70">{action.desc}</p>
+      {/* Hostel Occupancy Overview */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+        <h3 className="text-sm font-semibold text-gray-900 mb-1">🏠 Hostel Occupancy Overview</h3>
+        <p className="text-xs text-gray-500 mb-4">Block-wise occupancy & capacity utilization</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div style={{ width: '100%', height: 280 }}>
+            <ResponsiveContainer>
+              <BarChart data={[
+                { name: 'Aryabhatta', capacity: 120, occupied: 98 },
+                { name: 'Vikramshila', capacity: 105, occupied: 85 },
+                { name: 'Nalanda', capacity: 90, occupied: 88 },
+                { name: 'Takshila', capacity: 75, occupied: 72 },
+                { name: 'Chanakya', capacity: 40, occupied: 38 },
+              ]} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+                <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
+                <Legend verticalAlign="top" height={30} />
+                <Bar dataKey="capacity" name="Total Capacity" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="occupied" name="Occupied" fill="#10b981" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        ))}
+          <div className="space-y-4">
+            {[
+              { block: 'Aryabhatta Bhavan', occupancy: 82, gender: 'Boys', color: 'from-blue-500 to-blue-600' },
+              { block: 'Vikramshila Nilayam', occupancy: 81, gender: 'Boys', color: 'from-indigo-500 to-indigo-600' },
+              { block: 'Nalanda Vihar', occupancy: 98, gender: 'Girls', color: 'from-pink-500 to-pink-600' },
+              { block: 'Takshila Sadan', occupancy: 96, gender: 'Girls', color: 'from-purple-500 to-purple-600' },
+              { block: 'Chanakya Cottages', occupancy: 95, gender: 'Boys', color: 'from-cyan-500 to-cyan-600' },
+            ].map((block) => (
+              <div key={block.block} className="flex items-center gap-3">
+                <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${block.color}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-700">{block.block}</span>
+                    <span className="text-xs font-semibold text-gray-900">{block.occupancy}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                    <div className={`h-full rounded-full bg-gradient-to-r ${block.color}`} style={{ width: `${block.occupancy}%` }} />
+                  </div>
+                  <span className="text-[10px] text-gray-400">{block.gender}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

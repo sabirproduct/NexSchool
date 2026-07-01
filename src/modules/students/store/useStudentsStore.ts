@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Student, StudentFilters } from '../types';
-import { listStudents, softDeleteStudent } from '../services/studentService';
+import { listStudents, hardDeleteStudent } from '../services/studentService';
 import { useAuthStore } from '../../../store/authStore';
 
 type State = {
@@ -48,7 +48,7 @@ export const useStudentsStore = create<State>((set, get) => ({
   setFilters: (filters) => set({ filters, page: 0 }),
   setPage: (page) => set({ page }),
   setPageSize: (pageSize) => set({ pageSize, page: 0 }),
-  remove: async (id) => { await softDeleteStudent(id); await get().fetch(); },
+  remove: async (id) => { await hardDeleteStudent(id); await get().fetch(); },
   setSelectedIds: (selectedIds) => set({ selectedIds }),
   clearError: () => set({ error: null }),
 }));

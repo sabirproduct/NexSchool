@@ -199,6 +199,12 @@ export async function softDeleteStudent(id: string): Promise<Student | undefined
   return updateStudent(id, { status: 'inactive' });
 }
 
+export async function hardDeleteStudent(id: string): Promise<void> {
+  if (!db) throw new Error('Firebase not configured');
+  const { deleteDocument } = await import('../../../services/firestoreService');
+  await deleteDocument('students', id);
+}
+
 export async function promoteStudents(ids: string[], classId: string, sectionId: string, session: string): Promise<void> {
   const operations = ids.map((id) => ({
     type: 'update' as const,

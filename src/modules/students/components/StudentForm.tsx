@@ -7,7 +7,14 @@ import { fetchDropdownData, ClassOption, SectionOption, SessionOption } from '..
 import { useAuthStore } from '../../../store/authStore';
 import indiaStates from '../data/india-states.json';
 
-const steps = ['Basic Information', 'Parent Information', 'Academic Information', 'Address Information', 'Hostel Information', 'Document Upload'];
+const steps = [
+  { label: 'Basic Information', icon: '👤', desc: 'Personal details & contact', color: 'from-blue-500 to-blue-600' },
+  { label: 'Parent Information', icon: '👨‍👩‍👧‍👦', desc: 'Guardian & family details', color: 'from-emerald-500 to-emerald-600' },
+  { label: 'Academic Information', icon: '📚', desc: 'Class, section & admission', color: 'from-purple-500 to-purple-600' },
+  { label: 'Address Information', icon: '📍', desc: 'Residential address', color: 'from-amber-500 to-amber-600' },
+  { label: 'Hostel Information', icon: '🏠', desc: 'Hostel & accommodation', color: 'from-pink-500 to-pink-600' },
+  { label: 'Document Upload', icon: '📄', desc: 'Upload required documents', color: 'from-cyan-500 to-cyan-600' },
+];
 
 /** File preview entry with binary data */
 export interface FilePreview {
@@ -328,19 +335,30 @@ export function StudentForm({ defaultValues, onSubmit, mode }: { defaultValues?:
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="space-y-6">
-        <div className="flex flex-wrap gap-2 border-b border-slate-200">
-          {steps.map((label, index) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {steps.map((s, index) => (
             <button
-              key={label}
+              key={s.label}
               type="button"
               onClick={() => setStep(index)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
+              className={`relative flex flex-col items-center gap-1 rounded-xl p-3 text-center transition-all ${
                 index === step
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? `bg-gradient-to-br ${s.color} text-white shadow-lg scale-[1.02]`
+                  : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:shadow-sm'
               }`}
             >
-              {label}
+              <span className="text-xl">{s.icon}</span>
+              <span className={`text-[10px] font-semibold leading-tight ${index === step ? 'text-white' : 'text-slate-700'}`}>
+                {s.label.split(' ')[0]}
+              </span>
+              <span className={`text-[8px] leading-tight ${index === step ? 'text-white/80' : 'text-slate-400'}`}>
+                {s.desc}
+              </span>
+              {index < step && (
+                <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow">
+                  ✓
+                </div>
+              )}
             </button>
           ))}
         </div>
