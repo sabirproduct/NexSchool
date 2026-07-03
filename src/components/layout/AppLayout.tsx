@@ -25,13 +25,13 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { label: 'Exams', to: '/exams', icon: Icons.Exams, module: 'exams' },
   { label: 'Fees', to: '/fees', icon: Icons.Fees, module: 'fees' },
   { label: 'Hostel', to: '/hostel', icon: Icons.Hostel, module: 'hostel' },
-  // ⭐ Premium Modules
   { label: 'Safety Dashboard', to: '/safety', icon: Icons.Safety, module: 'safety' },
   { label: 'Health & Wellness', to: '/health', icon: Icons.Health, module: 'health' },
   { label: 'Scholarships', to: '/scholarship', icon: Icons.Scholarship, module: 'scholarship' },
   { label: 'Notifications', to: '/notifications', icon: Icons.Notifications, module: 'notifications' },
   { label: 'Parent Portal', to: '/parent', icon: Icons.ParentPortal, module: 'parent' },
   { label: 'Student Portal', to: '/student', icon: Icons.StudentPortal, module: 'student' },
+  { label: 'QR Attendance', to: '/qr-attendance', icon: Icons.QRAttendance, module: 'qr_attendance' },
   { label: 'System Config', to: '/system', icon: Icons.SystemConfig, module: 'system' },
 ];
 
@@ -82,9 +82,11 @@ export function AppLayout() {
     loadPermissions();
   }, [user, fallbackPermissions]);
 
-  const items = ALL_MENU_ITEMS.filter((item) =>
-    isModuleAllowed(item.module, rolePermissions)
-  );
+  const items = useMemo(() => {
+    return ALL_MENU_ITEMS.filter((item: MenuItem) =>
+      isModuleAllowed(item.module, rolePermissions)
+    );
+  }, [rolePermissions]);
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 

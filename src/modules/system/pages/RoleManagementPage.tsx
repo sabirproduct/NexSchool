@@ -26,6 +26,7 @@ const ALL_PERMISSIONS: RolePermission[] = [
   { module: 'notifications', label: 'Notifications', description: 'Send & manage notifications' },
   { module: 'parent', label: 'Parent Portal', description: 'Parent portal access' },
   { module: 'student', label: 'Student Portal', description: 'Student portal access' },
+  { module: 'qr_attendance', label: 'QR Attendance', description: 'QR code scanning & gate attendance management' },
   { module: 'system', label: 'System Config', description: 'System configuration & user management' },
 ];
 

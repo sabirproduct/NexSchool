@@ -8,6 +8,7 @@ import { StudentsPage } from '../features/students/Page';
 import { AddStudentPage, EditStudentPage, StudentDetailsPage, StudentPromotionPage } from '../modules/students/pages';
 import { AdmissionsPage } from '../features/admissions/Page';
 import { AttendancePage } from '../features/attendance/Page';
+import { QRAttendancePage } from '../modules/attendance/pages';
 import { AcademicsPage } from '../features/academics/Page';
 import { ExamsPage } from '../features/exams/Page';
 import { FeesPage } from '../features/fees/Page';
@@ -55,7 +56,8 @@ export function App() {
           <Route path="/students/:id/edit" element={<EditStudentPage />} />
           <Route path="/students/promotions" element={<StudentPromotionPage />} />
           <Route path="/admissions/*" element={<AdmissionsPage />} />
-          <Route path="/attendance" element={<AttendancePage />} />
+          <Route path="/attendance/*" element={<AttendancePage />} />
+          <Route path="/qr-attendance" element={<QRAttendancePage />} />
           <Route path="/academics" element={<AcademicsPage />} />
           <Route path="/exams" element={<ExamsPage />} />
           <Route path="/fees" element={<FeesPage />} />

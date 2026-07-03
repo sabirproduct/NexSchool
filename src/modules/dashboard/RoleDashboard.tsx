@@ -1,3 +1,4 @@
+import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { SuperAdminDashboard } from './SuperAdminDashboard';
 import { SchoolAdminDashboard } from './SchoolAdminDashboard';
@@ -48,11 +49,21 @@ const DASHBOARD_LABELS: Record<UserRole, { title: string; subtitle: string; grad
     subtitle: 'Track your children\'s academic progress, attendance, fees, and more',
     gradient: 'from-emerald-500 to-teal-600',
   },
+  gate_keeper: {
+    title: 'QR Attendance',
+    subtitle: 'QR attendance scanning, check-in & check-out management',
+    gradient: 'from-amber-500 to-orange-600',
+  },
 };
 
 export function RoleDashboard() {
   const user = useAuthStore((s) => s.user);
   const role = user?.role || 'school_admin';
+
+  // Gate keeper: redirected directly to /qr-attendance (their dedicated landing page)
+  if (role === 'gate_keeper') {
+    return <Navigate to="/qr-attendance" replace />;
+  }
 
   const renderDashboard = () => {
     switch (role) {
@@ -64,7 +75,6 @@ export function RoleDashboard() {
       case 'hostel_warden': return <HostelWardenDashboard />;
       case 'student':
       case 'parent':
-        // Students and parents have their own portals, so dashboard redirects to them
         return (
           <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
             <div className="text-5xl mb-4">

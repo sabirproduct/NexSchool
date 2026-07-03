@@ -99,4 +99,16 @@ export const Icons = {
       <path d="M2 12l10 5 10-5"/>
     </svg>
   ),
+  QRAttendance: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <rect x="3" y="3" width="7" height="7" rx="1"/>
+      <rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/>
+      <rect x="14" y="14" width="7" height="7" rx="1"/>
+      <line x1="7" y1="7" x2="7" y2="7.01"/>
+      <line x1="17" y1="7" x2="17" y2="7.01"/>
+      <line x1="7" y1="17" x2="7" y2="17.01"/>
+      <line x1="17" y1="17" x2="17" y2="17.01"/>
+    </svg>
+  ),
 };

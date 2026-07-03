@@ -9,4 +9,5 @@ export const roleModules: Record<UserRole, string[]> = {
   hostel_warden: ['dashboard','hostel','attendance','safety','health','notifications'],
   student: ['student','dashboard'],
   parent: ['parent','dashboard'],
+  gate_keeper: ['qr_attendance'],
 };

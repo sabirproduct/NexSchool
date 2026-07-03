@@ -30,4 +30,5 @@ export const SYSTEM_ROLES = [
   { key: 'hostel_warden', name: 'Hostel Warden', description: 'Hostel & dormitory management', isSystem: true },
   { key: 'student', name: 'Student', description: 'Student portal access', isSystem: true },
   { key: 'parent', name: 'Parent', description: 'Parent portal access', isSystem: true },
+  { key: 'gate_keeper', name: 'Gate Keeper', description: 'QR attendance scanning & gate management', isSystem: true },
 ] as const;

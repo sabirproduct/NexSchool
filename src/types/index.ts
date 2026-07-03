@@ -6,7 +6,8 @@ export type UserRole =
   | 'accountant'
   | 'hostel_warden'
   | 'student'
-  | 'parent';
+  | 'parent'
+  | 'gate_keeper';
 
 export interface AppUser {
   uid: string;

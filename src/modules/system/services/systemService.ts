@@ -223,6 +223,7 @@ export async function seedDefaultRoles() {
     hostel_warden: ['dashboard','hostel','attendance','notifications'],
     student: ['student','dashboard'],
     parent: ['parent','dashboard'],
+    gate_keeper: ['dashboard','qr_attendance'],
   };
 
   for (const r of SYSTEM_ROLES) {
