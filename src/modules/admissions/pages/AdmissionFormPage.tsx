@@ -1,8 +1,11 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
+import { useAuthStore } from '../../../store/authStore';
 import { useAdmissionsStore } from '../store/useAdmissionsStore';
-import { AdmissionApplication, PaymentMethod } from '../types';
+import { AdmissionApplication, PaymentMethod, RELIGION_OPTIONS } from '../types';
+import { generateApplicationNo, submitAdmissionApplication, getSystemConfig, recordAdmissionFeePayment, updateAdmissionEnquiry } from '../services/admissionService';
+import indiaStates from '../../students/data/india-states.json';
 
 interface FormData {
   studentFirstName: string;
@@ -18,6 +21,7 @@ interface FormData {
   address: string;
   city: string;
   state: string;
+  district: string;
   pincode: string;
   bloodGroup: string;
   religion: string;
@@ -27,73 +31,184 @@ interface FormData {
 const classOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-const ADMISSION_FORM_FEE = 500;
-
 export function AdmissionFormPage() {
   const navigate = useNavigate();
-  const { upsertApplication } = useAdmissionsStore();
+  const [searchParams] = useSearchParams();
+  const user = useAuthStore((s) => s.user);
+  const { systemConfig, setSystemConfig, addApplication } = useAdmissionsStore();
   const [step, setStep] = useState(1);
   const [showPayment, setShowPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('UPI');
   const [paymentDone, setPaymentDone] = useState(false);
   const [formData, setFormData] = useState<FormData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [upiId, setUpiId] = useState('school@nexpay');
+  const [admissionFee, setAdmissionFee] = useState(500);
+  const [cashReceivedBy, setCashReceivedBy] = useState('');
+  const [upiRefId, setUpiRefId] = useState('');
 
-  const { register, handleSubmit, formState: { errors }, watch } = useForm<FormData>();
+  const { register, handleSubmit, formState: { errors }, watch, setValue, trigger } = useForm<FormData>();
   const watchStudentType = watch('studentType');
+  const watchState = watch('state');
+  const watchDistrict = watch('district');
+
+  // Pre-populate form from enquiry URL params
+  useEffect(() => {
+    const studentName = searchParams.get('studentName');
+    const guardianName = searchParams.get('guardianName');
+    const mobile = searchParams.get('mobile');
+    const email = searchParams.get('email');
+    const classId = searchParams.get('classId');
+
+    if (studentName) {
+      const nameParts = studentName.split(' ');
+      setValue('studentFirstName', nameParts[0] || '');
+      setValue('studentLastName', nameParts.slice(1).join(' ') || '');
+    }
+    if (guardianName) setValue('guardianName', guardianName);
+    if (mobile) setValue('mobile', mobile);
+    if (email) setValue('email', email);
+    if (classId) setValue('applyingClassId', classId);
+  }, [searchParams, setValue]);
+
+  // Load system config
+  useEffect(() => {
+    const tenantId = user?.schoolId || 'school_001';
+    getSystemConfig(tenantId).then((config) => {
+      if (config) {
+        setSystemConfig(config);
+        setUpiId(config.upiId || 'school@nexpay');
+        setAdmissionFee(config.admissionFee || 500);
+      }
+    });
+  }, [user, setSystemConfig]);
+
+  // Get available states from india-states.json
+  const states = Object.keys(indiaStates);
+  const districts = watchState ? (indiaStates as any)[watchState]?.districts || {} : {};
+  const cities = watchState && watchDistrict ? (districts as any)[watchDistrict] || [] : [];
+
+  // When state changes, reset city/district
+  const handleStateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setValue('state', e.target.value);
+    setValue('district', '');
+    setValue('city', '');
+  };
+
+  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setValue('district', e.target.value);
+    setValue('city', '');
+  };
+
+  // Step navigation with validation
+  const goToNextStep = async () => {
+    let fieldsToValidate: (keyof FormData)[] = [];
+    if (step === 1) {
+      fieldsToValidate = ['studentFirstName', 'studentLastName', 'gender', 'dob'];
+    } else if (step === 2) {
+      fieldsToValidate = ['mobile', 'email', 'guardianName', 'address', 'city', 'state', 'pincode'];
+    }
+    const valid = await trigger(fieldsToValidate);
+    if (valid) setStep(step + 1);
+  };
 
   const submitForm = handleSubmit((data) => {
     setFormData(data);
     setShowPayment(true);
   });
 
-  const handlePaymentComplete = () => {
-    if (!formData) return;
+  const handlePaymentComplete = useCallback(async () => {
+    if (!formData || !user) return;
     setIsSubmitting(true);
 
-    const id = `app-${Date.now()}`;
-    const transactionId = `TXN${Date.now()}`;
+    const tenantId = user.schoolId || 'school_001';
+    const applicationNo = await generateApplicationNo(tenantId);
+    const id = `ADM-${Date.now()}`;
+    const transactionId = paymentMethod === 'UPI' ? upiRefId || `TXN${Date.now()}` : `TXN${Date.now()}`;
 
-    upsertApplication({
+    const application: AdmissionApplication = {
       id,
-      applicationNo: `NS-2026-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+      applicationNo,
+      tenantId,
       studentFirstName: formData.studentFirstName,
       studentLastName: formData.studentLastName,
       fullName: `${formData.studentFirstName} ${formData.studentLastName}`,
       gender: formData.gender,
       dob: formData.dob,
-      bloodGroup: formData.bloodGroup || undefined,
-      religion: formData.religion || undefined,
-      category: formData.category || undefined,
+      bloodGroup: formData.bloodGroup || null,
+      religion: formData.religion || null,
+      category: formData.category || null,
       studentType: formData.studentType,
       applyingClassId: formData.applyingClassId,
       guardianName: formData.guardianName,
+      guardianMobile: formData.guardianMobile || null,
       mobile: formData.mobile,
       email: formData.email,
-      address: formData.address || undefined,
-      city: formData.city || undefined,
-      state: formData.state || undefined,
-      pincode: formData.pincode || undefined,
+      address: formData.address || null,
+      city: formData.city || null,
+      state: formData.state || null,
+      district: formData.district || null,
+      pincode: formData.pincode || null,
       hostelRequired: formData.studentType === 'Residential',
       applicationStatus: 'Submitted',
       admissionFeeStatus: 'Paid',
-      admissionFeeAmount: ADMISSION_FORM_FEE,
+      admissionFeeAmount: admissionFee,
       paymentMethod,
       paymentReference: transactionId,
       paymentDetails: {
         transactionId,
-        upiId: paymentMethod === 'UPI' ? 'school@upi' : undefined,
-        qrScanned: paymentMethod === 'QR',
         paidAt: new Date().toISOString(),
+        ...(paymentMethod === 'UPI' ? { upiId } : {}),
+        ...(paymentMethod === 'Cash' ? { cashReceivedBy } : {}),
       },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       submittedAt: new Date().toISOString(),
-    } as AdmissionApplication);
+    };
 
-    setPaymentDone(true);
-    setIsSubmitting(false);
-  };
+    try {
+      // Save to Firestore
+      await submitAdmissionApplication(application);
+
+      // Record fee payment
+      await recordAdmissionFeePayment({
+        id: `FEE-${id}`,
+        tenantId,
+        applicationId: id,
+        applicationNo,
+        studentName: application.fullName,
+        feeAmount: admissionFee,
+        paymentMethod,
+        paymentReference: transactionId,
+        paymentDetails: {
+          transactionId,
+          ...(paymentMethod === 'UPI' ? { upiId } : {}),
+          ...(paymentMethod === 'Cash' ? { cashReceivedBy } : {}),
+          paidAt: new Date().toISOString(),
+        },
+        status: 'Paid',
+        createdAt: new Date().toISOString(),
+      });
+
+      // If this was from an enquiry, mark it as converted
+      const enquiryId = searchParams.get('enquiryId');
+      if (enquiryId) {
+        await updateAdmissionEnquiry(enquiryId, {
+          status: 'Converted',
+          convertedToApplicationId: id,
+        });
+      }
+
+      // Add to local store
+      addApplication(application);
+      setPaymentDone(true);
+    } catch (err) {
+      console.error('Failed to submit application:', err);
+      alert('Failed to submit application. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [formData, user, paymentMethod, upiRefId, upiId, admissionFee, cashReceivedBy, addApplication]);
 
   if (paymentDone) {
     return (
@@ -105,15 +220,20 @@ export function AdmissionFormPage() {
             </svg>
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Application Submitted!</h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Your admission application has been submitted successfully. Your application number will be sent to your registered email.
+          <p className="text-sm text-gray-500 mb-2">
+            Your admission application has been submitted successfully.
           </p>
+          {formData && (
+            <p className="text-xs text-gray-400 mb-6">
+              Application No: <span className="font-mono font-medium text-indigo-600">{formData.studentFirstName} {formData.studentLastName}</span>
+            </p>
+          )}
           <button
             type="button"
             onClick={() => navigate('/admissions')}
             className="w-full px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
           >
-            Back to Applications
+            Back to Management
           </button>
         </div>
       </div>
@@ -133,14 +253,14 @@ export function AdmissionFormPage() {
             <div className="bg-indigo-50 rounded-xl p-4 mb-6">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Admission Form Fee</span>
-                <span className="text-lg font-bold text-indigo-700">₹{ADMISSION_FORM_FEE}</span>
+                <span className="text-lg font-bold text-indigo-700">₹{admissionFee}</span>
               </div>
             </div>
 
             {/* Payment Method Selection */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">Select Payment Method</label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('UPI')}
@@ -151,8 +271,7 @@ export function AdmissionFormPage() {
                   }`}
                 >
                   <span className="text-2xl">📱</span>
-                  <p className="text-sm font-medium text-gray-900 mt-1">UPI Payment</p>
-                  <p className="text-xs text-gray-500">GPay, PhonePe, Paytm</p>
+                  <p className="text-sm font-medium text-gray-900 mt-1">UPI</p>
                 </button>
                 <button
                   type="button"
@@ -164,32 +283,55 @@ export function AdmissionFormPage() {
                   }`}
                 >
                   <span className="text-2xl">📷</span>
-                  <p className="text-sm font-medium text-gray-900 mt-1">QR Code</p>
-                  <p className="text-xs text-gray-500">Scan & Pay</p>
+                  <p className="text-sm font-medium text-gray-900 mt-1">QR</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('Cash')}
+                  className={`p-4 rounded-xl border-2 text-center transition-all ${
+                    paymentMethod === 'Cash'
+                      ? 'border-indigo-600 bg-indigo-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <span className="text-2xl">💵</span>
+                  <p className="text-sm font-medium text-gray-900 mt-1">Cash</p>
                 </button>
               </div>
             </div>
 
             {/* UPI Section */}
             {paymentMethod === 'UPI' && (
-              <div className="bg-gray-50 rounded-xl p-4 mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Pay via UPI</label>
-                <div className="flex items-center gap-3">
+              <div className="space-y-4 mb-6">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Pay via UPI</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      readOnly
+                      value={upiId}
+                      className="flex-1 px-3 py-2 text-sm font-mono bg-white border border-gray-300 rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard.writeText(upiId)}
+                      className="px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">Open your UPI app and pay to this UPI ID</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">UPI Transaction ID</label>
                   <input
                     type="text"
-                    readOnly
-                    value="school@nexpay"
-                    className="flex-1 px-3 py-2 text-sm font-mono bg-white border border-gray-300 rounded-lg"
+                    value={upiRefId}
+                    onChange={(e) => setUpiRefId(e.target.value)}
+                    placeholder="Enter UPI transaction reference ID"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                   />
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText('school@nexpay')}
-                    className="px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
-                  >
-                    Copy
-                  </button>
                 </div>
-                <p className="text-xs text-gray-400 mt-2">Open your UPI app and pay to this UPI ID</p>
               </div>
             )}
 
@@ -208,8 +350,36 @@ export function AdmissionFormPage() {
                         ))}
                       </div>
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">Scan this QR code to pay ₹{ADMISSION_FORM_FEE}</p>
+                    <p className="text-xs text-gray-400 mt-2">Scan this QR code to pay ₹{admissionFee}</p>
                   </div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">UPI Transaction ID</label>
+                  <input
+                    type="text"
+                    value={upiRefId}
+                    onChange={(e) => setUpiRefId(e.target.value)}
+                    placeholder="Enter transaction reference ID"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Cash Section */}
+            {paymentMethod === 'Cash' && (
+              <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cash Payment</label>
+                <p className="text-sm text-gray-500 mb-3">Pay ₹{admissionFee} in cash at the school office.</p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Received By (Staff Name)</label>
+                  <input
+                    type="text"
+                    value={cashReceivedBy}
+                    onChange={(e) => setCashReceivedBy(e.target.value)}
+                    placeholder="Enter staff name who received cash"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
                 </div>
               </div>
             )}
@@ -218,7 +388,7 @@ export function AdmissionFormPage() {
             <button
               type="button"
               onClick={handlePaymentComplete}
-              disabled={isSubmitting}
+              disabled={isSubmitting || (paymentMethod === 'Cash' && !cashReceivedBy.trim())}
               className="w-full px-4 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? (
@@ -230,7 +400,7 @@ export function AdmissionFormPage() {
                   Processing...
                 </span>
               ) : (
-                `Pay ₹${ADMISSION_FORM_FEE} & Submit`
+                `Pay ₹${admissionFee} & Submit`
               )}
             </button>
           </div>
@@ -368,10 +538,15 @@ export function AdmissionFormPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Religion</label>
-                      <input
+                      <select
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                         {...register('religion')}
-                      />
+                      >
+                        <option value="">Select Religion</option>
+                        {RELIGION_OPTIONS.map((rel) => (
+                          <option key={rel} value={rel}>{rel}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -439,33 +614,87 @@ export function AdmissionFormPage() {
                     <h4 className="text-sm font-medium text-gray-700 mb-3">Address</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="sm:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Address <span className="text-red-500">*</span>
+                        </label>
                         <textarea
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none ${
+                            errors.address ? 'border-red-400' : 'border-gray-300'
+                          }`}
                           rows={2}
-                          {...register('address')}
+                          {...register('address', { required: 'Address is required' })}
                         />
+                        {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address.message}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                        <input
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                          {...register('city')}
-                        />
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          State <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none ${
+                            errors.state ? 'border-red-400' : 'border-gray-300'
+                          }`}
+                          {...register('state', { required: 'State is required' })}
+                          onChange={handleStateChange}
+                        >
+                          <option value="">Select State</option>
+                          {states.map((st) => (
+                            <option key={st} value={st}>{st}</option>
+                          ))}
+                        </select>
+                        {errors.state && <p className="text-xs text-red-500 mt-1">{errors.state.message}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                        <input
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                          {...register('state')}
-                        />
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          District <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none ${
+                            errors.district ? 'border-red-400' : 'border-gray-300'
+                          }`}
+                          {...register('district', { required: 'District is required' })}
+                          onChange={handleDistrictChange}
+                          disabled={!watchState}
+                        >
+                          <option value="">Select District</option>
+                          {Object.keys(districts).map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                        {errors.district && <p className="text-xs text-red-500 mt-1">{errors.district.message}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          City <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none ${
+                            errors.city ? 'border-red-400' : 'border-gray-300'
+                          }`}
+                          {...register('city', { required: 'City is required' })}
+                          disabled={!watchDistrict}
+                        >
+                          <option value="">Select City</option>
+                          {cities.map((c: string) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                        {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city.message}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Pincode <span className="text-red-500">*</span>
+                        </label>
                         <input
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                          {...register('pincode')}
+                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none ${
+                            errors.pincode ? 'border-red-400' : 'border-gray-300'
+                          }`}
+                          {...register('pincode', {
+                            required: 'Pincode is required',
+                            pattern: { value: /^[0-9]{6}$/, message: 'Enter valid 6-digit pincode' }
+                          })}
                         />
+                        {errors.pincode && <p className="text-xs text-red-500 mt-1">{errors.pincode.message}</p>}
                       </div>
                     </div>
                   </div>
@@ -539,11 +768,11 @@ export function AdmissionFormPage() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm text-gray-600">
                           <span>Admission Form Fee</span>
-                          <span className="font-medium">₹{ADMISSION_FORM_FEE}</span>
+                          <span className="font-medium">₹{admissionFee}</span>
                         </div>
                         <div className="border-t border-gray-200 pt-2 flex justify-between text-sm font-semibold text-gray-900">
                           <span>Total</span>
-                          <span>₹{ADMISSION_FORM_FEE}</span>
+                          <span>₹{admissionFee}</span>
                         </div>
                       </div>
                     </div>
@@ -572,7 +801,7 @@ export function AdmissionFormPage() {
                 {step < 3 ? (
                   <button
                     type="button"
-                    onClick={() => setStep(step + 1)}
+                    onClick={goToNextStep}
                     className="inline-flex items-center gap-1.5 px-6 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
                   >
                     Next

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { StudentForm, StudentAdmissionFormValues } from '../components/StudentForm';
 import { createStudent, updateStudent } from '../services/studentService';
 import { uploadStudentDocuments } from '../services/storageService';
@@ -8,11 +9,55 @@ import { AdmissionPrintView } from '../components/AdmissionPrintView';
 import { compressImage } from '../utils/imageCompress';
 
 export function AddStudentPage() {
+  const [searchParams] = useSearchParams();
   const [toast, setToast] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [submitting, setSubmitting] = useState(false);
   const [submittedData, setSubmittedData] = useState<{ student: Student; formValues: StudentAdmissionFormValues } | null>(null);
   const schoolId = useAuthStore((s) => s.user?.schoolId);
+
+  // Build default values directly from URL params (synchronous - no useEffect delay)
+  const defaultValues = useMemo<Partial<StudentAdmissionFormValues> | undefined>(() => {
+    const firstName = searchParams.get('firstName');
+    if (!firstName) return undefined;
+
+    const getParam = (key: string) => searchParams.get(key) || '';
+
+    return {
+      firstName: getParam('firstName'),
+      lastName: getParam('lastName'),
+      gender: (getParam('gender') as 'male' | 'female' | 'other') || 'male',
+      dob: getParam('dob'),
+      mobile: getParam('mobile'),
+      email: getParam('email'),
+      bloodGroup: getParam('bloodGroup') || undefined,
+      religion: getParam('religion') || undefined,
+      category: getParam('category') || undefined,
+      parent: {
+        fatherName: '',
+        motherName: '',
+        guardianName: getParam('guardianName'),
+        guardianMobile: getParam('guardianMobile'),
+        guardianEmail: getParam('email') || undefined,
+      },
+      academic: {
+        admissionNo: getParam('admissionNo'),
+        rollNo: '',
+        admissionDate: new Date().toISOString().split('T')[0],
+        classId: getParam('classId'),
+        sectionId: '',
+        session: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+        studentType: (getParam('studentType') as 'day_scholar' | 'residential') || 'day_scholar',
+      },
+      address: {
+        addressLine: getParam('address'),
+        state: getParam('state'),
+        district: getParam('district') || '',
+        city: getParam('city'),
+        pinCode: getParam('pincode'),
+      },
+    };
+  }, [searchParams]);
 
   const handleSubmit = async (values: StudentAdmissionFormValues) => {
     setSubmitting(true);
@@ -113,7 +158,7 @@ export function AddStudentPage() {
         <div className="d-none d-sm-block">
           <h2 className="h5 mb-3">Add Student</h2>
         </div>
-        <StudentForm mode="create" onSubmit={handleSubmit} />
+        <StudentForm mode="create" onSubmit={handleSubmit} defaultValues={defaultValues} />
         {submitting && (
           <div className="position-fixed bottom-0 end-0 m-3">
             <div className="spinner-border text-primary" role="status">

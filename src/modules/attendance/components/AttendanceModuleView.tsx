@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../../store/authStore';
 import { useAttendanceStore, computeAnomalies, AnomalyRecord } from '../store/useAttendanceStore';
 import { AttendanceAnalyticsChart } from './AttendanceAnalyticsChart';
 import { AttendanceFilters } from './AttendanceFilters';
@@ -8,8 +9,11 @@ import { AttendanceStatusChip } from './AttendanceStatusChip';
 import { AttendanceCalendar } from './AttendanceCalendar';
 import { StudentAttendanceBreakdown } from './StudentAttendanceBreakdown';
 import { useAttendanceAnalytics } from '../hooks/useAttendanceAnalytics';
+import { StudentAttendanceRecord } from '../types';
+import { getAllDocuments } from '../../../services/firestoreService';
+import { db } from '../../../config/firebase';
 
-type DashboardTab = 'dashboard' | 'calendar' | 'students';
+type DashboardTab = 'dashboard' | 'calendar' | 'students' | 'pull';
 
 function NotifyButton({ anomaly }: { anomaly: AnomalyRecord }) {
   const [notified, setNotified] = useState(false);
@@ -51,9 +55,16 @@ function NotifyButton({ anomaly }: { anomaly: AnomalyRecord }) {
 
 export function AttendanceModuleView() {
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const schoolId = user?.schoolId || 'default-school';
   const [activeTab, setActiveTab] = useState<DashboardTab>('dashboard');
-  const { studentRecords, hostelRecords, teacherRecords } = useAttendanceStore();
+  const { studentRecords, hostelRecords, teacherRecords, fetchAttendanceData, loading } = useAttendanceStore();
   const analytics = useAttendanceAnalytics();
+
+  // Fetch real data on mount
+  useEffect(() => {
+    fetchAttendanceData(schoolId);
+  }, [fetchAttendanceData, schoolId]);
 
   const anomalies = useMemo(() => computeAnomalies(studentRecords), [studentRecords]);
 
@@ -83,6 +94,22 @@ export function AttendanceModuleView() {
           <p className="text-sm text-gray-500 mt-1">Track attendance with daily, weekly & monthly views</p>
         </div>
         <div className="flex items-center gap-3">
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600" />
+              Loading...
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => fetchAttendanceData(schoolId)}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
           <button
             type="button"
             onClick={() => navigate('/attendance/qr')}
@@ -108,6 +135,7 @@ export function AttendanceModuleView() {
           { id: 'dashboard' as const, label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
           { id: 'calendar' as const, label: 'Calendar', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
           { id: 'students' as const, label: 'Student Attendance', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+          { id: 'pull' as const, label: 'Pull Attendance', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -346,6 +374,199 @@ export function AttendanceModuleView() {
 
       {/* STUDENT ATTENDANCE TAB */}
       {activeTab === 'students' && <StudentAttendanceBreakdown />}
+
+      {/* PULL ATTENDANCE TAB */}
+      {activeTab === 'pull' && <PullAttendanceByDate schoolId={schoolId} />}
+    </div>
+  );
+}
+
+/**
+ * Pull Attendance By Date Component
+ * Allows selecting a date range and pulling all attendance records
+ */
+function PullAttendanceByDate({ schoolId }: { schoolId: string }) {
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [records, setRecords] = useState<StudentAttendanceRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
+
+  const fetchByDateRange = useCallback(async () => {
+    if (!startDate || !endDate) return;
+    setLoading(true);
+    try {
+      if (!db) {
+        setLoading(false);
+        return;
+      }
+      const allRecords = await getAllDocuments<StudentAttendanceRecord>('studentAttendance');
+      let filtered = allRecords.filter(r => r.attendanceDate >= startDate && r.attendanceDate <= endDate);
+      if (selectedClass) filtered = filtered.filter(r => r.classId === selectedClass);
+      if (selectedSection) filtered = filtered.filter(r => r.sectionId === selectedSection);
+      setRecords(filtered);
+    } catch (error) {
+      console.error('Error pulling attendance:', error);
+    }
+    setLoading(false);
+  }, [startDate, endDate, selectedClass, selectedSection]);
+
+  const summary = useMemo(() => {
+    const total = records.length;
+    const present = records.filter(r => r.status === 'Present').length;
+    const absent = records.filter(r => r.status === 'Absent').length;
+    const late = records.filter(r => r.status === 'Late').length;
+    const leave = records.filter(r => r.status === 'Leave' || r.status === 'Half Day').length;
+    return { total, present, absent, late, leave, pct: total > 0 ? Math.round((present / total) * 100) : 0 };
+  }, [records]);
+
+  // Group by date
+  const byDate = useMemo(() => {
+    const map = new Map<string, StudentAttendanceRecord[]>();
+    records.forEach(r => {
+      if (!map.has(r.attendanceDate)) map.set(r.attendanceDate, []);
+      map.get(r.attendanceDate)!.push(r);
+    });
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [records]);
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-900">Pull Attendance Records</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Select a date range to view all attendance records</p>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Class</label>
+              <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                <option value="">All Classes</option>
+                {['Playgroup', 'Nursery', 'LKG', 'UKG', 'Standard 1', 'Standard 2', 'Standard 3', 'Standard 4', 'Standard 5', 'Standard 6', 'Standard 7', 'Standard 8', 'Standard 9', 'Standard 10', '10', '11'].map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Section</label>
+              <select value={selectedSection} onChange={e => setSelectedSection(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                <option value="">All Sections</option>
+                {['A', 'B', 'C', 'D'].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button onClick={fetchByDateRange} disabled={loading || !startDate || !endDate}
+              className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2">
+              {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
+              Pull Records
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary */}
+      {records.length > 0 && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm text-center">
+              <p className="text-2xl font-bold text-gray-900">{summary.total}</p>
+              <p className="text-xs text-gray-500 mt-1">Total Records</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm text-center">
+              <p className="text-2xl font-bold text-green-600">{summary.present}</p>
+              <p className="text-xs text-gray-500 mt-1">Present</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm text-center">
+              <p className="text-2xl font-bold text-red-600">{summary.absent}</p>
+              <p className="text-xs text-gray-500 mt-1">Absent</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm text-center">
+              <p className="text-2xl font-bold text-amber-600">{summary.late}</p>
+              <p className="text-xs text-gray-500 mt-1">Late</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm text-center">
+              <p className={`text-2xl font-bold ${summary.pct >= 90 ? 'text-green-600' : summary.pct >= 75 ? 'text-amber-600' : 'text-red-600'}`}>
+                {summary.pct}%
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Attendance %</p>
+            </div>
+          </div>
+
+          {/* Records by Date */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-5 py-3 border-b border-gray-100">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Records ({records.length}) across {byDate.length} days
+              </span>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {byDate.map(([date, dateRecords]) => (
+                <div key={date} className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-900">
+                      {new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                    <span className="text-xs text-gray-500">{dateRecords.length} records</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-xs">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase">Student</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase">Class</th>
+                          <th className="px-3 py-2 text-center font-semibold text-gray-500 uppercase">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {dateRecords.map(r => (
+                          <tr key={r.attendanceId} className="hover:bg-gray-50">
+                            <td className="px-3 py-2">
+                              <span className="font-medium text-gray-900">{r.studentName}</span>
+                              <span className="text-gray-400 ml-1">(Roll: {r.rollNumber})</span>
+                            </td>
+                            <td className="px-3 py-2 text-gray-600">{r.classId}-{r.sectionId}</td>
+                            <td className="px-3 py-2 text-center"><AttendanceStatusChip status={r.status} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {!loading && records.length === 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center shadow-sm">
+          <svg className="mx-auto h-10 w-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p className="mt-2 text-sm text-gray-400">Select date range and click "Pull Records" to view attendance data</p>
+        </div>
+      )}
     </div>
   );
 }

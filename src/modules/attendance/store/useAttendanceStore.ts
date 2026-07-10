@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import { studentAttendanceSeed, teacherAttendanceSeed, hostelAttendanceSeed } from '../mocks/seed';
 import { AttendanceFiltersState, HostelAttendanceRecord, StudentAttendanceRecord, TeacherAttendanceRecord } from '../types';
+import { fetchStudentAttendance, fetchHostelAttendance, fetchStaffAttendance } from '../services/attendanceService';
+import { getAllDocuments, subscribeToCollection } from '../../../services/firestoreService';
+import { db } from '../../../config/firebase';
 
 export interface AnomalyRecord {
   studentId: string;
@@ -17,10 +19,13 @@ export interface AnomalyRecord {
 interface AttendanceState {
   filters: AttendanceFiltersState;
   loading: boolean;
+  error: string | null;
   studentRecords: StudentAttendanceRecord[];
   hostelRecords: HostelAttendanceRecord[];
   teacherRecords: TeacherAttendanceRecord[];
   setFilters: (payload: Partial<AttendanceFiltersState>) => void;
+  fetchAttendanceData: (schoolId: string) => Promise<void>;
+  fetchDataForDate: (schoolId: string, date: string) => Promise<StudentAttendanceRecord[]>;
 }
 
 function computeAnomalies(records: StudentAttendanceRecord[]): AnomalyRecord[] {
@@ -34,7 +39,6 @@ function computeAnomalies(records: StudentAttendanceRecord[]): AnomalyRecord[] {
 
   const anomalies: AnomalyRecord[] = [];
   for (const [, studentRecords] of studentMap) {
-    // For mock data, each student appears once, so analyze individually
     const sr = studentRecords[0];
     if (!sr) continue;
 
@@ -73,13 +77,72 @@ function computeAnomalies(records: StudentAttendanceRecord[]): AnomalyRecord[] {
   return anomalies.sort((a, b) => b.occurrences - a.occurrences);
 }
 
-export const useAttendanceStore = create<AttendanceState>((set) => ({
-  filters: { classId: '10', sectionId: 'A', date: '2026-05-25', subject: '', hostelId: '', roomId: '' },
+export const useAttendanceStore = create<AttendanceState>((set, get) => ({
+  filters: { classId: '', sectionId: '', date: new Date().toISOString().split('T')[0], subject: '', hostelId: '', roomId: '' },
   loading: false,
-  studentRecords: studentAttendanceSeed,
-  hostelRecords: hostelAttendanceSeed,
-  teacherRecords: teacherAttendanceSeed,
+  error: null,
+  studentRecords: [],
+  hostelRecords: [],
+  teacherRecords: [],
+
   setFilters: (payload) => set((state) => ({ filters: { ...state.filters, ...payload } })),
+
+  fetchAttendanceData: async (schoolId: string) => {
+    set({ loading: true, error: null });
+    const { filters } = get();
+    const today = new Date().toISOString().split('T')[0];
+    const date = filters.date || today;
+
+    try {
+      if (!db) {
+        set({ loading: false, studentRecords: [], hostelRecords: [], teacherRecords: [] });
+        return;
+      }
+
+      // Fetch student attendance
+      let studentRecords: StudentAttendanceRecord[] = [];
+      if (filters.classId && filters.sectionId) {
+        studentRecords = await fetchStudentAttendance(schoolId, filters.classId, filters.sectionId, date);
+      } else {
+        // Fetch all for today
+        studentRecords = await getAllDocuments<StudentAttendanceRecord>('studentAttendance');
+      }
+
+      // Fetch hostel attendance
+      let hostelRecords: HostelAttendanceRecord[] = [];
+      if (filters.hostelId) {
+        const records = await fetchHostelAttendance(schoolId, filters.hostelId, date);
+        hostelRecords = records as unknown as HostelAttendanceRecord[];
+      } else {
+        hostelRecords = await getAllDocuments<HostelAttendanceRecord>('hostelAttendance') as unknown as HostelAttendanceRecord[];
+      }
+
+      // Fetch staff/teacher attendance
+      let teacherRecords: TeacherAttendanceRecord[] = [];
+      teacherRecords = await getAllDocuments<TeacherAttendanceRecord>('teacherAttendance') as unknown as TeacherAttendanceRecord[];
+
+      set({
+        studentRecords,
+        hostelRecords,
+        teacherRecords,
+        loading: false,
+      });
+    } catch (error) {
+      console.error('Error fetching attendance data:', error);
+      set({ loading: false, error: 'Failed to fetch attendance data' });
+    }
+  },
+
+  fetchDataForDate: async (schoolId: string, date: string): Promise<StudentAttendanceRecord[]> => {
+    if (!db) return [];
+    try {
+      const records = await getAllDocuments<StudentAttendanceRecord>('studentAttendance');
+      return records.filter(r => r.attendanceDate === date);
+    } catch (error) {
+      console.error('Error fetching attendance for date:', error);
+      return [];
+    }
+  },
 }));
 
 export { computeAnomalies };

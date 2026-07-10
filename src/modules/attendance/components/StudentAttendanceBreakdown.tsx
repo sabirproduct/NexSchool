@@ -1,18 +1,58 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useAuthStore } from '../../../store/authStore';
 import { useAttendanceStore } from '../store/useAttendanceStore';
 import { AttendanceStatusChip } from './AttendanceStatusChip';
-import { getStudentList } from '../mocks/seed';
+import { StudentAttendanceRecord } from '../types';
+import { getAllDocuments } from '../../../services/firestoreService';
+import { db } from '../../../config/firebase';
 
 export function StudentAttendanceBreakdown() {
-  const { studentRecords } = useAttendanceStore();
-  const students = useMemo(() => getStudentList(studentRecords), [studentRecords]);
+  const user = useAuthStore((s) => s.user);
+  const schoolId = user?.schoolId || 'default-school';
+  const { studentRecords, fetchAttendanceData } = useAttendanceStore();
+  const [allRecords, setAllRecords] = useState<StudentAttendanceRecord[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'percentage' | 'absent'>('percentage');
+
+  useEffect(() => {
+    fetchAttendanceData(schoolId);
+  }, [fetchAttendanceData, schoolId]);
+
+  useEffect(() => {
+    const loadRecords = async () => {
+      if (!db) return;
+      setLoading(true);
+      try {
+        const records = await getAllDocuments<StudentAttendanceRecord>('studentAttendance');
+        setAllRecords(records);
+      } catch (error) {
+        console.error('Error loading student records:', error);
+      }
+      setLoading(false);
+    };
+    loadRecords();
+  }, []);
+
+  // Get unique students from records
+  const students = useMemo(() => {
+    const map = new Map<string, StudentAttendanceRecord>();
+    allRecords.forEach(r => {
+      if (!map.has(r.studentId)) map.set(r.studentId, r);
+    });
+    return Array.from(map.values()).map(r => ({
+      studentId: r.studentId,
+      studentName: r.studentName,
+      rollNumber: r.rollNumber,
+      classId: r.classId,
+      sectionId: r.sectionId,
+    }));
+  }, [allRecords]);
 
   const studentStats = useMemo(() => {
     return students
       .map((student) => {
-        const records = studentRecords.filter((r) => r.studentId === student.studentId);
+        const records = allRecords.filter((r) => r.studentId === student.studentId);
         const totalDays = records.length;
         const present = records.filter((r) => r.status === 'Present').length;
         const absent = records.filter((r) => r.status === 'Absent').length;
@@ -36,7 +76,7 @@ export function StudentAttendanceBreakdown() {
         if (sortBy === 'absent') return b.absent - a.absent;
         return a.percentage - b.percentage; // ascending (worst first)
       });
-  }, [students, studentRecords, searchQuery, sortBy]);
+  }, [students, allRecords, searchQuery, sortBy]);
 
   const summaryStats = useMemo(() => {
     const total = studentStats.length;
@@ -68,6 +108,14 @@ export function StudentAttendanceBreakdown() {
           <p className="text-xs text-gray-500 mt-1">{'At Risk (<75%)'}</p>
         </div>
       </div>
+
+      {/* Loading indicator */}
+      {loading && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-2 text-sm text-blue-700">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
+          Loading student attendance data...
+        </div>
+      )}
 
       {/* Search & Sort */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -172,7 +220,9 @@ export function StudentAttendanceBreakdown() {
         </div>
 
         {studentStats.length === 0 && (
-          <div className="text-center py-10 text-gray-400 text-sm">No students found matching your search</div>
+          <div className="text-center py-10 text-gray-400 text-sm">
+            {loading ? 'Loading...' : 'No students found matching your search'}
+          </div>
         )}
       </div>
     </div>

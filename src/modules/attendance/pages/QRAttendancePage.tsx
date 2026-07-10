@@ -182,14 +182,16 @@ export function QRAttendancePage() {
     if (result.success && result.record) {
       setLastScan(result.record);
       setQrStatus('success');
-      setQrMessage(result.message);
+      // Show student name + class info on success
+      const classInfo = meta.classId ? ` (${meta.classId}${meta.sectionId ? '-' + meta.sectionId : ''})` : '';
+      setQrMessage(`✅ ${person.userName}${classInfo} — ${currentDirection === 'IN' ? 'Check-In' : 'Check-Out'} successful`);
       await loadData();
     } else {
       setLastScan(null);
       setQrStatus('error');
       setQrMessage(result.message);
     }
-    setTimeout(() => { setQrStatus('idle'); setQrMessage(''); setLastScan(null); }, 3000);
+    setTimeout(() => { setQrStatus('idle'); setQrMessage(''); setLastScan(null); }, 4000);
   }, [schoolId, markedBy, loadData]);
 
   // ── QR scanner via effect (triggered by startScanner) ──
@@ -259,7 +261,12 @@ export function QRAttendancePage() {
     if (!id) { setManualError('Enter an ID.'); return; }
     setManualLoading(true); setManualError(''); setManualResult(null);
     const res = await lookupPersonById(id, schoolId);
-    if (res?.found) setManualResult(res);
+    if (res?.found) {
+      setManualResult(res);
+      // Show class info if available
+      const classInfo = res.metadata?.classId ? ` (${res.metadata.classId}${res.metadata.sectionId ? '-' + res.metadata.sectionId : ''})` : '';
+      setManualError(`Found: ${res.userName}${classInfo}`);
+    }
     else setManualError(`No person found with ID: ${id}`);
     setManualLoading(false);
   };
@@ -268,7 +275,9 @@ export function QRAttendancePage() {
     if (!manualResult) return;
     const res = await markAttendance(manualResult.userId, manualResult.userName, manualResult.userType, direction, schoolId, markedBy, manualResult.metadata);
     if (res.success) {
-      setQrMessage(res.message); setQrStatus('success');
+      const classInfo = manualResult.metadata?.classId ? ` (${manualResult.metadata.classId}${manualResult.metadata.sectionId ? '-' + manualResult.metadata.sectionId : ''})` : '';
+      setQrMessage(`✅ ${manualResult.userName}${classInfo} — ${direction === 'IN' ? 'Check-In' : 'Check-Out'} successful`);
+      setQrStatus('success');
       setLastScan(res.record || null);
       await loadData();
       setManualId(''); setManualResult(null);
@@ -307,6 +316,13 @@ export function QRAttendancePage() {
     setTimeout(() => setVResult(null), 5000);
   };
 
+  const handleVisitorInlineCheckout = async (visitorId: string) => {
+    const res = await visitorCheckOut(visitorId, schoolId, markedBy);
+    setVResult({ success: res.success, message: res.message });
+    if (res.success) { await loadData(); }
+    setTimeout(() => setVResult(null), 3000);
+  };
+
   const fmtTime = (ts: string) => {
     try { return new Date(ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }); } catch { return ts; }
   };
@@ -314,10 +330,12 @@ export function QRAttendancePage() {
     ({ student: 'bg-blue-100 text-blue-800', teacher: 'bg-purple-100 text-purple-800', employee: 'bg-orange-100 text-orange-800', others: 'bg-gray-100 text-gray-800' }[t] || 'bg-gray-100 text-gray-800');
   const dirBadge = (d: AttendanceDirection) => d === 'IN' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
 
-  const allToday = [
-    ...todayRecords.map((r) => ({ ...r, _tag: 'attendance' as const, _displayName: r.userName })),
-    ...todayVisitors.map((r) => ({ ...r, _tag: 'visitor' as const, _displayName: r.visitorName })),
-  ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  // Separate check-in records (active) for displaying in the list
+  const checkedInRecords = todayRecords.filter(r => r.direction === 'IN');
+  const checkedOutRecords = todayRecords.filter(r => r.direction === 'OUT');
+  // Active visitors (checked in but not yet checked out)
+  const activeVisitors = todayVisitors.filter(r => r.direction === 'IN' && !r.checkOutTime);
+  const checkedOutVisitors = todayVisitors.filter(r => r.direction === 'OUT' || r.checkOutTime);
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
@@ -405,10 +423,14 @@ export function QRAttendancePage() {
                   </svg>
                 </div>
                 <p className="mt-2 font-semibold text-green-800">{lastScan.userName}</p>
+                {lastScan.metadata?.classId && (
+                  <p className="text-xs text-green-600">{lastScan.metadata.classId}{lastScan.metadata.sectionId ? '-' + lastScan.metadata.sectionId : ''}</p>
+                )}
                 <div className="mt-1 flex justify-center gap-2">
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${typeBadge(lastScan.userType)}`}>{lastScan.userType}</span>
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${dirBadge(lastScan.direction)}`}>{lastScan.direction}</span>
                 </div>
+                <p className="text-xs text-green-500 mt-1">{fmtTime(lastScan.timestamp)}</p>
               </div>
             )}
             {qrStatus === 'error' && (
@@ -439,6 +461,9 @@ export function QRAttendancePage() {
             <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-gray-900">{manualResult.userName}</p>
+                {manualResult.metadata?.classId && (
+                  <p className="text-xs text-blue-600">Class: {manualResult.metadata.classId}{manualResult.metadata.sectionId ? '-' + manualResult.metadata.sectionId : ''}</p>
+                )}
                 <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-xs font-medium ${typeBadge(manualResult.userType)}`}>{manualResult.userType}</span>
                 <p className="text-xs text-gray-400 font-mono mt-0.5">ID: {manualResult.userId}</p>
               </div>
@@ -530,9 +555,9 @@ export function QRAttendancePage() {
             </form>
           </div>
 
-          {/* Check Out */}
+          {/* Check Out by ID */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Check Out</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Check Out by Visitor ID</h3>
             <div className="flex gap-2">
               <input type="text" value={visitorCheckoutId} onChange={(e) => setVisitorCheckoutId(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleVisitorCheckOut(); } }}
@@ -543,33 +568,134 @@ export function QRAttendancePage() {
         </div>
       )}
 
-      {/* ── Today's Feed ── */}
-      {allToday.length > 0 && (
+      {/* ── Today's Checked In Students with Name, Class, Time ── */}
+      {checkedInRecords.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today ({allToday.length})</span>
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Checked In Today ({checkedInRecords.length})
+            </span>
             <button onClick={loadData} className="text-gray-400 hover:text-gray-600" title="Refresh">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             </button>
           </div>
-          <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
-            {allToday.map((rec, idx) => (
-              <div key={idx} className="px-4 py-2 flex items-center gap-3 text-sm hover:bg-gray-50 transition-colors">
-                <span className="text-xs text-gray-400 w-14 flex-shrink-0">{fmtTime(rec.timestamp)}</span>
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                  style={{ background: rec._tag === 'visitor' ? 'linear-gradient(135deg, #f59e0b, #ea580c)' : 'linear-gradient(135deg, #6366f1, #7c3aed)' }}>
-                  {(rec._displayName).charAt(0).toUpperCase()}
+          <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+            {checkedInRecords.map((rec, idx) => (
+              <div key={idx} className="px-4 py-2.5 flex items-center gap-3 text-sm hover:bg-gray-50 transition-colors">
+                <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold flex-shrink-0">
+                  {rec.userName.charAt(0).toUpperCase()}
                 </div>
-                <span className="flex-1 font-medium text-gray-900 truncate">{rec._displayName}</span>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${typeBadge(rec._tag === 'visitor' ? (rec as any).reference : (rec as UnifiedAttendanceRecord).userType)}`}>
-                  {rec._tag === 'visitor' ? `visitor/${(rec as any).reference}` : (rec as UnifiedAttendanceRecord).userType}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{rec.userName}</p>
+                  {rec.metadata?.classId && (
+                    <p className="text-xs text-gray-500">{rec.metadata.classId}{rec.metadata.sectionId ? '-' + rec.metadata.sectionId : ''}</p>
+                  )}
+                </div>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${typeBadge(rec.userType)}`}>{rec.userType}</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">{fmtTime(rec.timestamp)}</span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${dirBadge(rec.direction)}`}>{rec.direction}</span>
               </div>
             ))}
           </div>
         </div>
       )}
+
+      {/* ── Today's Checked Out ── */}
+      {checkedOutRecords.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div className="px-4 py-2.5 border-b border-gray-100">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Checked Out Today ({checkedOutRecords.length})
+            </span>
+          </div>
+          <div className="divide-y divide-gray-50 max-h-48 overflow-y-auto">
+            {checkedOutRecords.map((rec, idx) => (
+              <div key={idx} className="px-4 py-2 flex items-center gap-3 text-sm hover:bg-gray-50 transition-colors">
+                <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center text-red-700 text-xs font-bold flex-shrink-0">
+                  {rec.userName.charAt(0).toUpperCase()}
+                </div>
+                <span className="flex-1 font-medium text-gray-900 truncate">{rec.userName}</span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${typeBadge(rec.userType)}`}>{rec.userType}</span>
+                <span className="text-xs text-gray-400">{fmtTime(rec.timestamp)}</span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${dirBadge(rec.direction)}`}>{rec.direction}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Active Visitors with Checkout Button ── */}
+      {activeVisitors.length > 0 && (
+        <div className="bg-white rounded-xl border border-amber-200 shadow-sm">
+          <div className="px-4 py-2.5 border-b border-amber-100 bg-amber-50">
+            <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
+              Active Visitors ({activeVisitors.length})
+            </span>
+          </div>
+          <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+            {activeVisitors.map((rec, idx) => (
+              <div key={idx} className="px-4 py-2.5 flex items-center gap-3 text-sm hover:bg-gray-50 transition-colors">
+                <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 text-xs font-bold flex-shrink-0">
+                  {rec.visitorName.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{rec.visitorName}</p>
+                  <p className="text-xs text-gray-400 font-mono">ID: {rec.visitorId}</p>
+                  {rec.referenceName && <p className="text-xs text-gray-500">Visiting: {rec.referenceName}</p>}
+                  {rec.purpose && <p className="text-xs text-gray-400">Purpose: {rec.purpose}</p>}
+                </div>
+                <span className="text-xs text-gray-400 flex-shrink-0">{fmtTime(rec.timestamp)}</span>
+                <button
+                  onClick={() => handleVisitorInlineCheckout(rec.visitorId)}
+                  className="px-3 py-1 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors flex-shrink-0"
+                >
+                  Check Out
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Today's Combined Feed (legacy) ── */}
+      {(() => {
+        const allToday = [
+          ...todayRecords.map((r) => ({ ...r, _tag: 'attendance' as const, _displayName: r.userName })),
+          ...todayVisitors.map((r) => ({ ...r, _tag: 'visitor' as const, _displayName: r.visitorName })),
+        ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+        if (allToday.length === 0) return null;
+
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's Activity ({allToday.length})</span>
+              <button onClick={loadData} className="text-gray-400 hover:text-gray-600" title="Refresh">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              </button>
+            </div>
+            <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+              {allToday.map((rec, idx) => (
+                <div key={idx} className="px-4 py-2 flex items-center gap-3 text-sm hover:bg-gray-50 transition-colors">
+                  <span className="text-xs text-gray-400 w-14 flex-shrink-0">{fmtTime(rec.timestamp)}</span>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                    style={{ background: rec._tag === 'visitor' ? 'linear-gradient(135deg, #f59e0b, #ea580c)' : 'linear-gradient(135deg, #6366f1, #7c3aed)' }}>
+                    {(rec._displayName).charAt(0).toUpperCase()}
+                  </div>
+                  <span className="flex-1 font-medium text-gray-900 truncate">{rec._displayName}</span>
+                  {rec._tag === 'visitor' && (rec as any).visitorId && (
+                    <span className="text-[10px] text-gray-400 font-mono">{(rec as any).visitorId}</span>
+                  )}
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${typeBadge(rec._tag === 'visitor' ? (rec as any).reference : (rec as UnifiedAttendanceRecord).userType)}`}>
+                    {rec._tag === 'visitor' ? `visitor/${(rec as any).reference}` : (rec as UnifiedAttendanceRecord).userType}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${dirBadge(rec.direction)}`}>{rec.direction}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <canvas ref={canvasRef} className="hidden" />
     </div>

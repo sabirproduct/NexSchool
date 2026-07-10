@@ -1,7 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useAuthStore } from '../../../store/authStore';
 import { useAttendanceStore } from '../store/useAttendanceStore';
 import { AttendanceStatusChip } from './AttendanceStatusChip';
-import { getAttendanceDates } from '../mocks/seed';
+import { StudentAttendanceRecord } from '../types';
+import { getAllDocuments } from '../../../services/firestoreService';
+import { db } from '../../../config/firebase';
 
 type ViewMode = 'daily' | 'weekly' | 'monthly';
 
@@ -44,11 +47,38 @@ function getMonthGrid(year: number, month: number): (Date | null)[][] {
 }
 
 export function AttendanceCalendar() {
-  const { studentRecords, setFilters } = useAttendanceStore();
+  const user = useAuthStore((s) => s.user);
+  const schoolId = user?.schoolId || 'default-school';
+  const { studentRecords, setFilters, fetchAttendanceData } = useAttendanceStore();
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
-  const [selectedDate, setSelectedDate] = useState(() => new Date('2026-05-25'));
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [allRecords, setAllRecords] = useState<StudentAttendanceRecord[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const allDates = useMemo(() => getAttendanceDates(studentRecords), [studentRecords]);
+  // Fetch all attendance records from Firestore
+  useEffect(() => {
+    fetchAttendanceData(schoolId);
+  }, [fetchAttendanceData, schoolId]);
+
+  useEffect(() => {
+    const loadAllRecords = async () => {
+      if (!db) return;
+      setLoading(true);
+      try {
+        const records = await getAllDocuments<StudentAttendanceRecord>('studentAttendance');
+        setAllRecords(records);
+      } catch (error) {
+        console.error('Error loading attendance records:', error);
+      }
+      setLoading(false);
+    };
+    loadAllRecords();
+  }, []);
+
+  const allDates = useMemo(() => {
+    const dates = new Set(allRecords.map(r => r.attendanceDate));
+    return Array.from(dates).sort();
+  }, [allRecords]);
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
@@ -65,12 +95,12 @@ export function AttendanceCalendar() {
     setSelectedDate(d);
   };
 
-  const goToToday = () => setSelectedDate(new Date('2026-05-25'));
+  const goToToday = () => setSelectedDate(new Date());
 
   const recordsForDate = useMemo(() => {
     const dateStr = selectedDate.toISOString().split('T')[0];
-    return studentRecords.filter(r => r.attendanceDate === dateStr);
-  }, [studentRecords, selectedDate]);
+    return allRecords.filter(r => r.attendanceDate === dateStr);
+  }, [allRecords, selectedDate]);
 
   const statsForDate = useMemo(() => {
     const total = recordsForDate.length;
@@ -94,7 +124,7 @@ export function AttendanceCalendar() {
 
   const getDateRecords = (date: Date) => {
     const ds = date.toISOString().split('T')[0];
-    return studentRecords.filter(r => r.attendanceDate === ds);
+    return allRecords.filter(r => r.attendanceDate === ds);
   };
 
   const dateStatusSummary = (date: Date) => {
@@ -109,7 +139,7 @@ export function AttendanceCalendar() {
   };
 
   const isToday = (date: Date) => {
-    const today = new Date('2026-05-25');
+    const today = new Date();
     return date.toDateString() === today.toDateString();
   };
 
@@ -173,6 +203,16 @@ export function AttendanceCalendar() {
           </div>
         </div>
 
+        {/* Loading indicator */}
+        {loading && (
+          <div className="px-5 py-2 bg-blue-50 border-b border-blue-100">
+            <div className="flex items-center gap-2 text-xs text-blue-700">
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
+              Loading attendance records...
+            </div>
+          </div>
+        )}
+
         {/* Daily View */}
         {viewMode === 'daily' && (
           <div className="p-5">
@@ -233,7 +273,7 @@ export function AttendanceCalendar() {
             <div className="grid grid-cols-7 gap-2">
               {weeklyDates.map((date) => {
                 const ds = date.toISOString().split('T')[0];
-                const records = studentRecords.filter(r => r.attendanceDate === ds);
+                const records = allRecords.filter(r => r.attendanceDate === ds);
                 const present = records.filter(r => r.status === 'Present').length;
                 const total = records.length;
                 const pct = total > 0 ? Math.round((present / total) * 100) : 0;
@@ -287,7 +327,7 @@ export function AttendanceCalendar() {
                   {week.map((date, di) => {
                     if (!date) return <div key={`empty-${wi}-${di}`} />;
                     const ds = date.toISOString().split('T')[0];
-                    const records = studentRecords.filter(r => r.attendanceDate === ds);
+                    const records = allRecords.filter(r => r.attendanceDate === ds);
                     const present = records.filter(r => r.status === 'Present').length;
                     const total = records.length;
                     const pct = total > 0 ? Math.round((present / total) * 100) : 0;

@@ -1,33 +1,42 @@
 import { create } from 'zustand';
-import { admissionSeed } from '../mocks/seed';
-import { AdmissionApplication, AdmissionFiltersState, AdmissionStatus } from '../types';
+import { AdmissionApplication, AdmissionEnquiry, AdmissionFeeRecord, SystemConfig } from '../types';
 
 interface AdmissionsState {
   applications: AdmissionApplication[];
-  filters: AdmissionFiltersState;
-  setFilters: (filters: Partial<AdmissionFiltersState>) => void;
-  upsertApplication: (application: AdmissionApplication) => void;
-  updateStatus: (id: string, status: AdmissionStatus, rejectionReason?: string) => void;
+  enquiries: AdmissionEnquiry[];
+  feeRecords: AdmissionFeeRecord[];
+  systemConfig: SystemConfig | null;
+  loading: boolean;
+  error: string | null;
+  setApplications: (apps: AdmissionApplication[]) => void;
+  setEnquiries: (enqs: AdmissionEnquiry[]) => void;
+  setFeeRecords: (fees: AdmissionFeeRecord[]) => void;
+  setSystemConfig: (config: SystemConfig | null) => void;
+  addApplication: (app: AdmissionApplication) => void;
+  updateApplication: (id: string, updates: Partial<AdmissionApplication>) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
 }
 
 export const useAdmissionsStore = create<AdmissionsState>((set) => ({
-  applications: admissionSeed,
-  filters: { search: '' },
-  setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters } })),
-  upsertApplication: (application) =>
-    set((state) => {
-      const idx = state.applications.findIndex((item) => item.id === application.id);
-      if (idx === -1) return { applications: [application, ...state.applications] };
-      const clone = [...state.applications];
-      clone[idx] = application;
-      return { applications: clone };
-    }),
-  updateStatus: (id, status, rejectionReason) =>
+  applications: [],
+  enquiries: [],
+  feeRecords: [],
+  systemConfig: null,
+  loading: false,
+  error: null,
+  setApplications: (applications) => set({ applications }),
+  setEnquiries: (enquiries) => set({ enquiries }),
+  setFeeRecords: (feeRecords) => set({ feeRecords }),
+  setSystemConfig: (systemConfig) => set({ systemConfig }),
+  addApplication: (app) =>
+    set((state) => ({ applications: [app, ...state.applications] })),
+  updateApplication: (id, updates) =>
     set((state) => ({
-      applications: state.applications.map((item) =>
-        item.id === id
-          ? { ...item, applicationStatus: status, rejectionReason, updatedAt: new Date().toISOString() }
-          : item
-      )
-    }))
+      applications: state.applications.map((app) =>
+        app.id === id ? { ...app, ...updates } : app
+      ),
+    })),
+  setLoading: (loading) => set({ loading }),
+  setError: (error) => set({ error }),
 }));
